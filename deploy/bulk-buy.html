@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D9488" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <title>קבוצות רכישה — כפר-לינק</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .deal-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; transition: all var(--t-base); }
+    .deal-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+    .deal-img { aspect-ratio: 16/9; background: linear-gradient(135deg, var(--leaf), var(--primary-soft)); display: grid; place-items: center; font-size: 64px; position: relative; cursor: pointer; }
+    .deal-status { position: absolute; top: 14px; inset-inline-end: 14px; }
+    .deal-hero-badge { position: absolute; top: 14px; inset-inline-start: 14px; background: linear-gradient(135deg, #fff8e1, #fef3c7); color: #92400e; padding: 6px 12px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; box-shadow: var(--shadow-sm); }
+    .deal-body { padding: var(--space-5); }
+    .deal-title { font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 6px; line-height: 1.3; cursor: pointer; }
+    .deal-org { font-size: 13px; color: var(--ink-soft); margin-bottom: var(--space-4); }
+    .deal-price { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 4px; }
+    .price-current { font-size: 26px; font-weight: 800; color: var(--green-deep); line-height: 1; }
+    .price-was { font-size: 14px; color: var(--ink-faint); text-decoration: line-through; margin-bottom: 3px; }
+    .price-saved { display: inline-block; background: var(--leaf); color: var(--green-deep); padding: 3px 10px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; margin-bottom: var(--space-4); }
+    .price-explainer { background: var(--surface-alt); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; color: var(--ink-muted); margin-bottom: var(--space-4); line-height: 1.5; }
+    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: var(--space-5); align-items: center; }
+    .deals-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-5); }
+    @media (max-width: 700px) { .deals-grid { grid-template-columns: 1fr; } }
+    .kl-section { margin-bottom: var(--space-5); }
+    .kl-section h4 { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 15px; }
+    .kl-info-box { background: var(--surface-alt); border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.6; }
+    .kl-info-box strong { color: var(--ink); }
+    .kl-scenario { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+    .kl-scenario.is-best { border-color: var(--green); background: var(--leaf); }
+    .kl-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="dashboard.html" class="brand"><span class="brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg></span>כפר-לינק</a>
+      <nav class="nav-links">
+        <a href="dashboard.html">הבית שלי</a>
+        <a href="bulk-buy.html" class="active">קבוצות רכישה</a>
+        <a href="share-board.html">לוח שיתוף</a>
+        <a href="gig-jobs.html">ג'ובים</a>
+        <a href="activities.html">פעילויות</a>
+      </nav>
+      <div class="nav-user"><span class="avatar">?</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="page-hero-bg"></div>
+      <div class="container page-hero-inner">
+        <div class="flex-between" style="align-items: flex-end; flex-wrap: wrap;">
+          <div>
+            <span class="eyebrow"><span class="dot"></span> מודול: קבוצת רכישה</span>
+            <h1 style="font-size: clamp(28px, 4vw, 40px); margin-bottom: 10px;"><span class="gradient-text">חוסכים יחד.</span> משלמים פחות.</h1>
+            <p class="text-muted" style="max-width: 540px;">ככל שיותר שכנים מצטרפים — המחיר ליחידה יורד. גיבור משלוח מקבל 5% הנחה אישית כתודה.</p>
+          </div>
+          <button id="btn-new-deal" class="btn btn-green btn-lg">פתחו רכישה חדשה
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="filter-bar">
+        <div class="tabs">
+          <button class="tab active" data-filter="all">הכל</button>
+          <button class="tab" data-filter="active">פעילות</button>
+          <button class="tab" data-filter="closing">מסתיים בקרוב</button>
+          <button class="tab" data-filter="mine">שלי</button>
+        </div>
+      </div>
+
+      <div class="deals-grid mb-6" id="deals-grid">
+        <!-- מתמלא דינמית מ-JS -->
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <div class="container app-footer-inner">
+        <div>© 2026 כפר-לינק · נבנה בידי הקהילה</div>
+        <nav class="footer-links"><a href="#">פרטיות</a><a href="mailto:hello@kfar-link.org">צור קשר</a></nav>
+      </div>
+    </footer>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // בדיקת התחברות
+    if (!window.KL || !KL.user.isLoggedIn()) { window.location.href = 'onboarding.html'; }
+
+    // ====== רנדור כרטיס דיל ======
+    function renderDealCard(deal) {
+      const pricing = KL.deals.pricing(deal);
+      const status = KL.deals.statusInfo(deal);
+      const userIn = KL.deals.isUserIn(deal);
+      const userP = KL.deals.getUserParticipant(deal);
+      const heroPerson = (deal.participants || []).find(p => p.is_delivery_hero);
+      const isMine = (deal.organizer_phone === KL.user.phone());
+
+      const heroBadge = heroPerson ? '<span class="deal-hero-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>גיבור: ' + heroPerson.name + '</span>' : '';
+      const youBadge = userIn ? '<span class="deal-status badge badge-green"><span class="dot"></span> ✓ אתם משתתפים</span>' : ('<span class="deal-status badge badge-' + status.color + '"><span class="dot"></span> ' + status.label + '</span>');
+
+      const wasPriceHtml = (deal.price_retail > pricing.price_per_unit) ? '<span class="price-was">₪' + deal.price_retail + '</span>' : '';
+      const savedHtml = pricing.savings_pct > 0 ? '<span class="price-saved">חיסכון: ' + pricing.savings_pct + '% מול הסופר</span>' : '';
+
+      const myQtyHtml = userIn ? '<div style="background:var(--leaf);color:var(--green-deep);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;font-weight:600;">הזמנתם: ' + userP.quantity + ' יחידות</div>' : '';
+
+      const card = document.createElement('article');
+      card.className = 'deal-card';
+      card.dataset.dealId = deal.id;
+      card.innerHTML = `
+        <div class="deal-img kl-open-detail">
+          <span style="font-size:64px;">${deal.product_emoji || '📦'}</span>
+          ${heroBadge}
+          ${youBadge}
+        </div>
+        <div class="deal-body">
+          <h3 class="deal-title kl-open-detail">${deal.name}</h3>
+          <div class="deal-org">${deal.supplier} · מארגן: ${deal.organizer_name}${isMine ? ' (אתם)' : ''}</div>
+          <div class="deal-price">
+            <span class="price-current">₪${pricing.price_per_unit}</span>
+            ${wasPriceHtml}
+          </div>
+          ${savedHtml}
+          <div class="price-explainer">
+            <strong>חישוב חי:</strong> ${pricing.total_units} יחידות מוזמנות · ${pricing.full_boxes} ארגזים · ₪${pricing.total_cost} סה"כ
+          </div>
+          ${myQtyHtml}
+          <div class="progress-label">
+            <span>${pricing.total_units} יחידות / ${pricing.units_to_next_box} לארגז הבא</span>
+            <strong class="text-${status.color === 'green' ? 'green' : ''}">${pricing.box_is_full ? 'ארגז מלא ✓' : status.label}</strong>
+          </div>
+          <div class="progress mb-4"><div class="progress-fill" style="width:${Math.round(pricing.box_fill_ratio*100)}%"></div></div>
+          <div class="flex gap-3">
+            <button class="btn btn-ghost btn-sm kl-open-detail" style="flex: 1;">פרטים מלאים</button>
+            ${userIn 
+              ? '<button class="btn btn-soft btn-sm kl-update-qty">עדכן כמות</button><button class="btn btn-danger btn-sm kl-leave">יציאה</button>'
+              : (pricing.box_is_full 
+                  ? '<button class="btn btn-ghost btn-sm" disabled>ארגז מלא - פתחו עסקה חדשה</button>'
+                  : '<button class="btn btn-green btn-sm kl-join">הצטרפו (' + pricing.units_remaining + ' פנויים)</button>')
+            }
+          </div>
+        </div>
+      `;
+
+      // אירועים
+      card.querySelectorAll('.kl-open-detail').forEach(el => {
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', (e) => { e.preventDefault(); openDealDetail(deal.id); });
+      });
+      card.querySelector('.kl-join')?.addEventListener('click', (e) => { e.stopPropagation(); openJoinModal(deal); });
+      card.querySelector('.kl-update-qty')?.addEventListener('click', (e) => { e.stopPropagation(); openUpdateQtyModal(deal); });
+      card.querySelector('.kl-leave')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('לבטל השתתפות ב-' + deal.name + '?')) return;
+        KL.deals.leave(deal.id);
+        KL.toast('השתתפות בוטלה', 'info');
+        renderAllDeals();
+      });
+      return card;
+    }
+
+    function renderAllDeals(filter) {
+      filter = filter || 'all';
+      const grid = document.getElementById('deals-grid');
+      grid.innerHTML = '';
+      let deals = KL.deals.all();
+      if (filter === 'active') deals = deals.filter(d => KL.deals.statusInfo(d).daysLeft > 1);
+      else if (filter === 'closing') deals = deals.filter(d => KL.deals.statusInfo(d).daysLeft <= 3);
+      else if (filter === 'mine') deals = deals.filter(d => KL.deals.isUserIn(d) || d.organizer_phone === KL.user.phone());
+      if (deals.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ink-soft);">אין רכישות בקטגוריה זו</div>';
+        return;
+      }
+      deals.forEach(d => grid.appendChild(renderDealCard(d)));
+    }
+
+    // ====== מודאל הצטרפות עם בחירת כמות ======
+    function openJoinModal(deal) {
+      const pricing = KL.deals.pricing(deal);
+      const max = pricing.units_remaining;
+      KL.modal.open({
+        title: 'הצטרפות ל-' + deal.name,
+        fields: [
+          { name: 'quantity', label: 'כמות יחידות שלי (1-' + max + ')', type: 'number', value: 1, min: 1, max: max, required: true, inputmode: 'numeric',
+            hint: 'מחיר ליחידה: ₪' + pricing.price_per_unit + ' · קמעונאי: ₪' + deal.price_retail + ' · פנוי בארגז: ' + max + ' יחידות' }
+        ],
+        submitLabel: 'הצטרפו לעסקה 🚀',
+        onSubmit: (data, close) => {
+          const qty = parseInt(data.quantity);
+          if (!qty || qty < 1) { KL.toast('בחרו כמות תקינה', 'error'); return; }
+          if (qty > max) { KL.toast('בארגז יש רק ' + max + ' יחידות פנויות. פתחו עסקה חדשה לעוד.', 'error'); return; }
+          const result = KL.deals.join(deal.id, qty);
+          if (!result.ok) {
+            if (result.reason === 'no_room') KL.toast('הארגז מלא! פתחו עסקה חדשה למוצר זה.', 'error');
+            else KL.toast('שגיאה בהצטרפות', 'error');
+            return;
+          }
+          KL.toast('הצטרפתם ל-' + deal.name + '!', 'success');
+          close();
+          renderAllDeals();
+        }
+      });
+    }
+
+    function openUpdateQtyModal(deal) {
+      const userP = KL.deals.getUserParticipant(deal);
+      const pricing = KL.deals.pricing(deal);
+      const otherUnits = pricing.total_units - userP.quantity;
+      const maxAllowed = deal.box_size - otherUnits;
+      KL.modal.open({
+        title: 'עדכון כמות',
+        fields: [{ name: 'quantity', label: 'כמות חדשה (1-' + maxAllowed + ')', type: 'number', value: userP.quantity, min: 1, max: maxAllowed, required: true, inputmode: 'numeric',
+          hint: 'בארגז יש מקום לעוד ' + (maxAllowed - userP.quantity) + ' יחידות מעבר לכמות הנוכחית שלכם' }],
+        submitLabel: 'עדכנו',
+        onSubmit: (data, close) => {
+          const qty = parseInt(data.quantity);
+          if (!qty || qty < 1) { KL.toast('כמות לא תקינה', 'error'); return; }
+          const result = KL.deals.updateQuantity(deal.id, qty);
+          if (!result.ok) {
+            KL.toast('המקסימום בארגז: ' + (result.max || maxAllowed) + ' יחידות', 'error');
+            return;
+          }
+          KL.toast('הכמות עודכנה ל-' + qty, 'success');
+          close();
+          renderAllDeals();
+        }
+      });
+    }
+
+    // ====== עריכת עסקה (למארגן בלבד) ======
+    function openEditDealModal(deal) {
+      KL.modal.open({
+        title: '✏️ עריכת עסקה: ' + deal.name,
+        fields: [
+          { name: 'product_emoji', label: 'אימוג\'י מוצר', value: deal.product_emoji },
+          { name: 'name', label: 'שם המוצר *', value: deal.name, required: true },
+          { name: 'supplier', label: 'שם העסק / ספק *', value: deal.supplier, required: true },
+          { name: 'price_retail', label: 'מחיר קמעונאי (₪)', type: 'number', value: deal.price_retail, min: 1, step: 0.5, required: true, inputmode: 'decimal' },
+          { name: 'price_per_box', label: 'מחיר ארגז (₪) *', type: 'number', value: deal.price_per_box, min: 1, step: 5, required: true, inputmode: 'decimal' },
+          { name: 'box_size', label: 'יחידות בארגז *', type: 'number', value: deal.box_size, min: 1, required: true, inputmode: 'numeric' },
+          { name: 'business_address', label: 'כתובת העסק', value: deal.business_address || '', required: false },
+          { name: 'business_hours', label: 'שעות פתיחה', value: deal.business_hours || '', required: false },
+          { name: 'business_phone', label: 'טלפון העסק', value: deal.business_phone || '', type: 'tel', required: false },
+          { name: 'no_delivery', label: 'אין אפשרות למשלוח חיצוני', type: 'checkbox', value: deal.no_delivery },
+          { name: 'delivery_cost', label: 'עלות משלוח (₪)', type: 'number', value: deal.delivery_cost || 0, min: 0, step: 5, required: false, inputmode: 'decimal' },
+          { name: 'target_date', label: 'תאריך יעד *', type: 'date', value: deal.target_date, required: true }
+        ],
+        submitLabel: '💾 שמור שינויים',
+        onSubmit: (data, close) => {
+          if (!data.name || !data.supplier) { KL.toast('שם וספק חובה', 'error'); return; }
+          const newBoxSize = parseInt(data.box_size);
+          const totalUnits = (deal.participants || []).reduce((s, p) => s + p.quantity, 0);
+          if (newBoxSize < totalUnits) {
+            KL.toast('לא ניתן להקטין ארגז ל-' + newBoxSize + ' (כבר הוזמנו ' + totalUnits + ' יחידות)', 'error');
+            return;
+          }
+          const updates = {
+            product_emoji: data.product_emoji || '📦',
+            name: data.name, supplier: data.supplier,
+            price_retail: parseFloat(data.price_retail),
+            price_per_box: parseFloat(data.price_per_box),
+            box_size: newBoxSize,
+            business_address: data.business_address || '',
+            business_hours: data.business_hours || '',
+            business_phone: data.business_phone || '',
+            no_delivery: !!data.no_delivery,
+            delivery_cost: data.no_delivery ? 0 : parseFloat(data.delivery_cost || 0),
+            target_date: data.target_date
+          };
+          KL.deals.edit(deal.id, updates);
+          KL.toast('העסקה עודכנה!', 'success');
+          close();
+          renderAllDeals();
+        }
+      });
+    }
+
+    // ====== מודאל פרטים מלאים ======
+    function openDealDetail(dealId) {
+      const deal = KL.deals.findById(dealId);
+      if (!deal) return;
+      const pricing = KL.deals.pricing(deal);
+      const heroInfo = KL.deals.heroInfo(deal, pricing.price_per_unit);
+      const userIn = KL.deals.isUserIn(deal);
+      const userP = KL.deals.getUserParticipant(deal);
+      const status = KL.deals.statusInfo(deal);
+
+      // תרחישי מחיר
+      const scenarioC = pricing.target_price; // מחיר בסיס - מתנדב חינם
+      const scenarioA = !deal.no_delivery ? Math.round(((deal.price_per_box + deal.delivery_cost) / deal.box_size) * 100) / 100 : null;
+      const scenarioB_hero = pricing.target_price; // גיבור משלם רק על המוצר
+      const TRIP_FEE = 20;
+      const heroQty = (deal.participants || []).find(p => p.is_delivery_hero)?.quantity || 0;
+      const othersUnits = pricing.total_units - heroQty;
+      let scenarioB_others = scenarioC;
+      if (othersUnits > 0) {
+        const maxTrip = (deal.price_retail - scenarioC) * othersUnits;
+        const actualTrip = Math.min(TRIP_FEE, maxTrip);
+        scenarioB_others = Math.round((scenarioC + actualTrip / othersUnits) * 100) / 100;
+      }
+
+      let body = '';
+
+      // 1. פרטי עסקה
+      body += '<div class="kl-section"><h4>📦 פרטי המוצר</h4><div class="kl-info-box">';
+      body += '<strong>ספק:</strong> ' + deal.supplier + '<br>';
+      body += '<strong>מחיר קמעונאי (סופר):</strong> ₪' + deal.price_retail + ' ליחידה<br>';
+      body += '<strong>מחיר ארגז מהספק:</strong> ₪' + deal.price_per_box + ' ל-' + deal.box_size + ' יחידות<br>';
+      body += '<strong>מחיר ספק ליחידה:</strong> ₪' + (deal.price_per_box / deal.box_size).toFixed(2) + '<br>';
+      body += '<strong>תאריך יעד:</strong> ' + new Date(deal.target_date).toLocaleDateString('he-IL') + ' (' + status.daysLeft + ' ימים נשארו)';
+      body += '</div></div>';
+
+      // 2. פרטי העסק
+      body += '<div class="kl-section"><h4>🏪 פרטי העסק (לאיסוף)</h4><div class="kl-info-box">';
+      if (deal.business_address) body += '<strong>כתובת:</strong> ' + deal.business_address + '<br>';
+      if (deal.business_hours) body += '<strong>שעות פתיחה:</strong> ' + deal.business_hours + '<br>';
+      if (deal.business_phone) body += '<strong>טלפון:</strong> <a href="tel:' + deal.business_phone + '" style="color:var(--primary);">' + deal.business_phone + '</a><br>';
+      if (deal.no_delivery) body += '<strong style="color:var(--orange);">⚠️ אין אפשרות למשלוח חיצוני - איסוף עצמי בלבד</strong>';
+      else body += '<strong>עלות משלוח חיצוני:</strong> ₪' + deal.delivery_cost;
+      body += '</div></div>';
+
+      // 3. תרחישי מחיר
+      body += '<div class="kl-section"><h4>💰 תרחישי מחיר ליחידה</h4>';
+      body += '<div class="kl-scenario is-best"><div style="display:flex;justify-content:space-between;align-items:center;"><div><span class="kl-pill" style="background:var(--green);color:#fff;">⭐ הכי זול</span> <strong>תרחיש C - מתנדב חינם</strong></div><div style="font-size:18px;font-weight:800;color:var(--green-deep);">₪' + scenarioC.toFixed(2) + '</div></div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">שכן מתנדב לאסוף ולחלק - כולם משלמים מחיר בסיס</div></div>';
+      if (scenarioA !== null) {
+        body += '<div class="kl-scenario"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>תרחיש A - משלוח חיצוני</strong></div><div style="font-size:16px;font-weight:700;">₪' + scenarioA.toFixed(2) + '</div></div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">משלוח של העסק עד הכפר - חולקים שווה</div></div>';
+      }
+      body += '<div class="kl-scenario"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>תרחיש B - גיבור עם דמי נסיעה</strong></div><div style="font-size:14px;">לאחרים: ₪' + scenarioB_others.toFixed(2) + '<br>לגיבור: ₪' + scenarioB_hero.toFixed(2) + '</div></div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">גיבור מקבל עד ₪20 דמי נסיעה מהאחרים</div></div>';
+      body += '</div>';
+
+      // 4. גיבור משלוח - 2 סוגי התנדבות + ביטול
+      const userIsHero = KL.deals.isUserHero(deal);
+      body += '<div class="kl-section"><h4>🌟 גיבור משלוח</h4>';
+      if (heroInfo) {
+        body += '<div class="kl-info-box" style="background:linear-gradient(135deg,#fff8e1,#fef3c7);margin-bottom:10px;">';
+        body += '<strong>' + heroInfo.name + '</strong> מתנדב/ת לאסוף ולחלק.<br>';
+        body += '<strong>סוג התנדבות:</strong> ' + (deal.carrier && deal.carrier.type === 'no_discount' ? 'מתנדב חינם ✨' : 'גיבור עם 5% הנחה') + '<br>';
+        if (deal.carrier && deal.carrier.type === 'with_discount') {
+          body += 'עלות מקורית: ₪' + heroInfo.original_cost + ' | הנחה: ₪' + heroInfo.discount + ' | סופי: ₪' + heroInfo.final_cost;
+        }
+        body += '</div>';
+        if (userIsHero) {
+          body += '<button class="btn btn-danger btn-block kl-cancel-hero">בטל את ההתנדבות שלי כגיבור</button>';
+        }
+      } else {
+        body += '<div class="kl-info-box" style="margin-bottom:10px;">עדיין אין גיבור משלוח. בחרו סוג התנדבות:</div>';
+        if (userIn) {
+          body += '<div style="display:flex;flex-direction:column;gap:8px;">';
+          body += '<button class="btn btn-green btn-block kl-be-hero-free">';
+          body += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">';
+          body += '<strong>✨ מתנדב חינם</strong>';
+          body += '<span style="font-size:12px;font-weight:400;">הכי טוב לקבוצה - ללא הנחה אישית, מחיר בסיס לכולם</span>';
+          body += '</div></button>';
+          body += '<button class="btn btn-soft btn-block kl-be-hero-discount">';
+          body += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">';
+          body += '<strong>🌟 גיבור עם 5% הנחה</strong>';
+          body += '<span style="font-size:12px;font-weight:400;">תקבלו הנחה אישית של 5% (עד ₪20)</span>';
+          body += '</div></button>';
+          body += '</div>';
+        } else {
+          body += '<div style="font-size:12.5px;color:var(--ink-soft);">צריך קודם להצטרף לעסקה.</div>';
+        }
+      }
+      body += '</div>';
+
+      // 5. רשימת משתתפים
+      body += '<div class="kl-section"><h4>👥 משתתפים (' + (deal.participants || []).length + ' · ' + pricing.total_units + ' יחידות)</h4>';
+      body += '<div style="display:flex;flex-direction:column;gap:6px;">';
+      (deal.participants || []).forEach(p => {
+        const isMe = p.phone === KL.user.phone();
+        body += '<div style="display:flex;justify-content:space-between;background:' + (isMe ? 'var(--leaf)' : 'var(--surface-alt)') + ';padding:8px 12px;border-radius:8px;font-size:13.5px;">';
+        body += '<span>' + p.name + (isMe ? ' (אתם)' : '') + (p.is_delivery_hero ? ' ⭐' : '') + '</span>';
+        body += '<span style="font-weight:700;">' + p.quantity + ' יחידות</span>';
+        body += '</div>';
+      });
+      body += '</div></div>';
+
+      // 6. תגובות
+      body += '<div class="kl-section"><h4>💬 דיון בין משתתפים</h4>';
+      body += '<div id="kl-comments" style="margin-bottom:14px;">';
+      const comments = deal.comments || [];
+      if (comments.length === 0) body += '<div style="font-size:13px;color:var(--ink-soft);font-style:italic;">אין תגובות עדיין. היו הראשונים!</div>';
+      else comments.forEach(c => {
+        body += '<div style="background:var(--surface-alt);border-radius:8px;padding:10px 12px;margin-bottom:6px;">';
+        body += '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;"><strong style="color:var(--ink);">' + c.author + '</strong><span>' + c.at + '</span></div>';
+        body += '<div style="font-size:14px;">' + c.text + '</div></div>';
+      });
+      body += '</div>';
+      body += '<div style="display:flex;gap:6px;"><input type="text" class="input" id="kl-comment-input" placeholder="הוסיפו תגובה..." style="flex:1;"/><button type="button" class="btn btn-blue btn-sm kl-comment-send">שלח</button></div>';
+      body += '</div>';
+
+      // 7. כפתורי פעולה
+      body += '<div class="kl-section" style="border-top:1px solid var(--border);padding-top:18px;">';
+      // אם המשתמש הוא המארגן - כפתור עריכה
+      if (KL.deals.isOrganizer(deal)) {
+        body += '<button type="button" class="btn btn-blue btn-block kl-edit-deal" style="margin-bottom:10px;">✏️ ערוך פרטי עסקה</button>';
+      }
+      if (userIn) {
+        body += '<div style="background:var(--leaf);padding:10px 14px;border-radius:12px;text-align:center;font-weight:600;color:var(--green-deep);margin-bottom:10px;">✓ אתם משתתפים · ' + userP.quantity + ' יחידות</div>';
+        body += '<div style="display:flex;gap:8px;"><button type="button" class="btn btn-soft kl-detail-update" style="flex:1;">עדכן כמות</button><button type="button" class="btn btn-danger kl-detail-leave" style="flex:1;">יציאה מהעסקה</button></div>';
+      } else if (pricing.box_is_full) {
+        body += '<div style="background:var(--orange-soft);padding:10px 14px;border-radius:12px;text-align:center;font-weight:600;color:var(--orange-deep);">ארגז מלא · פתחו עסקה חדשה אם רוצים להזמין</div>';
+      } else {
+        body += '<button type="button" class="btn btn-green btn-block kl-detail-join">הצטרפו לעסקה (' + pricing.units_remaining + ' פנויים)</button>';
+      }
+      body += '</div>';
+
+      KL.modal.open({
+        title: (deal.product_emoji || '📦') + ' ' + deal.name,
+        body: body, hideCancel: true, hideSubmit: true,
+        onMount: (overlay) => {
+          overlay.querySelector('.kl-comment-send')?.addEventListener('click', () => {
+            const input = overlay.querySelector('#kl-comment-input');
+            const text = input.value.trim();
+            if (!text) return;
+            KL.deals.addComment(deal.id, text);
+            KL.modal.close();
+            setTimeout(() => openDealDetail(deal.id), 100);
+          });
+          overlay.querySelector('.kl-detail-join')?.addEventListener('click', () => { KL.modal.close(); openJoinModal(deal); });
+          overlay.querySelector('.kl-detail-update')?.addEventListener('click', () => { KL.modal.close(); openUpdateQtyModal(deal); });
+          overlay.querySelector('.kl-detail-leave')?.addEventListener('click', () => {
+            if (!confirm('לבטל השתתפות?')) return;
+            KL.deals.leave(deal.id);
+            KL.toast('השתתפות בוטלה', 'info');
+            KL.modal.close();
+            renderAllDeals();
+          });
+          overlay.querySelector('.kl-be-hero-free')?.addEventListener('click', () => {
+            if (!confirm('להתנדב כמתנדב חינם? כולם משלמים מחיר בסיס - הכי טוב לקבוצה ✨')) return;
+            KL.deals.becomeCarrier(deal.id, 'no_discount');
+            KL.toast('תודה רבה על ההתנדבות החינמית! 🙏', 'success');
+            KL.modal.close();
+            setTimeout(() => openDealDetail(deal.id), 200);
+          });
+          overlay.querySelector('.kl-be-hero-discount')?.addEventListener('click', () => {
+            if (!confirm('להתנדב כגיבור עם 5% הנחה אישית (עד ₪20)?')) return;
+            KL.deals.becomeCarrier(deal.id, 'with_discount');
+            KL.toast('תודה! אתם הגיבור החדש 🌟', 'success');
+            KL.modal.close();
+            setTimeout(() => openDealDetail(deal.id), 200);
+          });
+          overlay.querySelector('.kl-cancel-hero')?.addEventListener('click', () => {
+            if (!confirm('לבטל את ההתנדבות כגיבור?')) return;
+            KL.deals.leaveCarrier(deal.id);
+            KL.toast('ההתנדבות בוטלה. שכן אחר יכול להתנדב.', 'info');
+            KL.modal.close();
+            setTimeout(() => openDealDetail(deal.id), 200);
+          });
+          overlay.querySelector('.kl-edit-deal')?.addEventListener('click', () => {
+            KL.modal.close();
+            setTimeout(() => openEditDealModal(deal), 200);
+          });
+        }
+      });
+    }
+
+    // ====== מודאל יצירת רכישה חדשה - 13 שדות ======
+    function openNewDealModal() {
+      const today = new Date();
+      const inWeek = new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+
+      KL.modal.open({
+        title: '📢 פתיחת רכישה קבוצתית חדשה',
+        fields: [
+          { name: 'product_emoji', label: 'אימוג\'י מוצר', value: '📦', hint: 'בחרו אימוג\'י שמייצג את המוצר' },
+          { name: 'name', label: 'שם המוצר *', placeholder: 'שמן זית, נייר A4...', required: true },
+          { name: 'supplier', label: 'שם העסק / ספק *', placeholder: 'מכולת שמואל...', required: true },
+          { name: 'price_retail', label: 'מחיר קמעונאי (₪/יחידה בסופר)', type: 'number', value: 30, min: 1, step: 0.5, required: true, inputmode: 'decimal', hint: 'כמה זה עולה לבד בסופר' },
+          { name: 'price_per_box', label: 'מחיר ארגז מהספק (₪) *', type: 'number', value: 100, min: 1, step: 5, required: true, inputmode: 'decimal' },
+          { name: 'box_size', label: 'יחידות בארגז *', type: 'number', value: 6, min: 1, required: true, inputmode: 'numeric' },
+          { name: 'business_address', label: 'כתובת העסק', placeholder: 'רחוב הרצל 5, תל אביב', required: false },
+          { name: 'business_hours', label: 'שעות פתיחה', placeholder: 'א\'-ו\' 8:00-20:00', required: false },
+          { name: 'business_phone', label: 'טלפון העסק', placeholder: '03-1234567', type: 'tel', required: false },
+          { name: 'no_delivery', label: 'אין אפשרות למשלוח חיצוני (איסוף עצמי בלבד)', type: 'checkbox', hint: 'אם מסומן - יידרש מתנדב לאסוף מהעסק' },
+          { name: 'delivery_cost', label: 'עלות משלוח חיצוני (₪)', type: 'number', value: 25, min: 0, step: 5, required: false, inputmode: 'decimal' },
+          { name: 'target_date', label: 'תאריך יעד הגעה לכפר *', type: 'date', value: inWeek, required: true },
+          { name: 'my_qty', label: 'כמות יחידות שלי *', type: 'number', value: 1, min: 1, max: 50, required: true, inputmode: 'numeric' }
+        ],
+        submitLabel: '📢 פרסם עסקה',
+        onSubmit: (data, close) => {
+          if (!data.name || !data.supplier) { KL.toast('שם מוצר וספק חובה', 'error'); return; }
+          const box_size = parseInt(data.box_size);
+          const price_per_box = parseFloat(data.price_per_box);
+          const price_retail = parseFloat(data.price_retail);
+          if (price_per_box / box_size >= price_retail) {
+            if (!confirm('⚠️ מחיר הספק ליחידה גבוה ממחיר הקמעונאי. האם זו עסקה כדאית?')) return;
+          }
+          const u = KL.user.current;
+          const newDeal = {
+            id: 'd_' + Date.now(),
+            product_emoji: data.product_emoji || '📦',
+            name: data.name, supplier: data.supplier,
+            price_retail: price_retail, box_size: box_size, price_per_box: price_per_box,
+            business_address: data.business_address || '', business_hours: data.business_hours || '', business_phone: data.business_phone || '',
+            delivery_cost: data.no_delivery ? 0 : parseFloat(data.delivery_cost || 0),
+            no_delivery: !!data.no_delivery,
+            target_date: data.target_date,
+            created_at: new Date().toISOString(),
+            status: 'open',
+            organizer_name: u.name, organizer_phone: u.phone,
+            carrier: null, comments: [],
+            participants: [{
+              id: 'p_' + Date.now(),
+              name: u.name, phone: u.phone,
+              quantity: parseInt(data.my_qty),
+              need_expiry: data.target_date
+            }]
+          };
+          KL.deals.create(newDeal);
+          KL.toast('"' + data.name + '" פורסמה בהצלחה!', 'success');
+          close();
+          renderAllDeals();
+        }
+      });
+    }
+
+    // ====== Init ======
+    document.getElementById('btn-new-deal').addEventListener('click', openNewDealModal);
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderAllDeals(tab.dataset.filter);
+      });
+    });
+    renderAllDeals();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D9488" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <title>עבודות מזדמנות — כפר-לינק</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .job-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      transition: all var(--t-base);
+    }
+    .job-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+
+    .job-head {
+      display: flex;
+      gap: 14px;
+      margin-bottom: var(--space-4);
+    }
+    .job-icon {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .job-icon-orange { background: var(--orange-soft); color: var(--orange-deep); }
+    .job-icon-green { background: var(--leaf); color: var(--green-deep); }
+    .job-icon-purple { background: var(--leaf); color: var(--purple); }
+
+    .job-title { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 4px; line-height: 1.3; }
+    .job-poster { font-size: 13px; color: var(--ink-soft); }
+
+    .job-wage {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      margin-bottom: var(--space-3);
+    }
+    .wage-amount { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+    .wage-type { font-size: 13px; color: var(--ink-soft); margin-bottom: 2px; }
+
+    .job-desc {
+      font-size: 14px;
+      color: var(--ink-muted);
+      line-height: 1.55;
+      margin-bottom: var(--space-4);
+    }
+
+    .job-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+      margin-bottom: var(--space-4);
+    }
+
+    .jobs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    @media (max-width: 700px) { .jobs-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="dashboard.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+        </span>
+        כפר-לינק
+      </a>
+      <nav class="nav-links" aria-label="ניווט ראשי">
+        <a href="dashboard.html">הבית שלי</a>
+        <a href="bulk-buy.html">קבוצות רכישה</a>
+        <a href="share-board.html">לוח שיתוף</a>
+        <a href="gig-jobs.html" class="active">ג'ובים</a>
+        <a href="activities.html">פעילויות</a>
+      </nav>
+      <div class="nav-user"><span class="avatar">דנ</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="page-hero-bg" aria-hidden="true"></div>
+      <div class="container page-hero-inner">
+        <div class="flex-between" style="align-items: flex-end; flex-wrap: wrap;">
+          <div>
+            <span class="eyebrow"><span class="dot"></span> מודול: עבודות מזדמנות</span>
+            <h1 style="font-size: clamp(28px, 4vw, 40px); margin-bottom: 10px;">
+              עזרה <span class="gradient-text">קרובה לבית.</span>
+            </h1>
+            <p class="text-muted" style="max-width: 540px; font-size: 16px;">
+              ג'ובים קצרים בקהילה — בייביסיטר, הליכת כלב, עזרה בקניות. תשלום שעתי, לפי משימה, או החלפת טובות.
+            </p>
+          </div>
+          <button class="btn btn-green btn-lg">פרסמו ג'וב חדש
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <div class="flex-between mb-5" style="flex-wrap: wrap;">
+        <div class="tabs">
+          <button class="tab active">פתוחים (5)</button>
+          <button class="tab">מתאימים לי (2)</button>
+          <button class="tab">פרסמתי (1)</button>
+          <button class="tab">היסטוריה</button>
+        </div>
+        <div class="flex gap-2">
+          <select class="select" style="min-height: 36px; padding: 6px 12px; font-size: 13px; min-width: 140px;">
+            <option>כל סוגי התשלום</option>
+            <option>שעתי</option>
+            <option>למשימה</option>
+            <option>החלפת טובות</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="jobs-grid mb-6">
+
+        <!-- ג'וב 1: בייביסיטר -->
+        <article class="job-card">
+          <div class="job-head">
+            <div class="job-icon job-icon-purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h.01M15 12h.01M9.5 16.5c.83.67 1.79 1 2.5 1s1.67-.33 2.5-1"/><circle cx="12" cy="12" r="10"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="job-title">בייביסיטר לילד בן 4 — שישי בערב</div>
+              <div class="job-poster">פרסמה: דנה · בניין 3 · לפני 2 שעות</div>
+            </div>
+            <span class="badge badge-green"><span class="dot"></span> פתוח</span>
+          </div>
+
+          <div class="job-wage">
+            <span class="wage-amount">₪50</span>
+            <span class="wage-type">לשעה · 4 שעות (18:00-22:00)</span>
+          </div>
+
+          <p class="job-desc">
+            יוצאים לארוחה עם חברים, צריך מישהו אחראי שיודע לנהל ילד בן 4. הילד אוכל לבד, מתעייף ב-20:30. ניסיון עם ילדים — חובה.
+          </p>
+
+          <div class="job-meta">
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg> 8 במאי</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 18:00-22:00</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg> בניין 3</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 3 פניות</span>
+          </div>
+
+          <button class="btn btn-green btn-block">אני מעוניינ/ת</button>
+        </article>
+
+        <!-- ג'וב 2: הליכת כלב -->
+        <article class="job-card">
+          <div class="job-head">
+            <div class="job-icon job-icon-orange">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-7 0V15a5 5 0 0 1 2-4z"/><path d="M5 13a2 2 0 0 1 2-2"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="job-title">הליכת כלב יומית — 7 ימים</div>
+              <div class="job-poster">פרסם: יואב · בניין 7 · לפני יום</div>
+            </div>
+            <span class="badge badge-orange"><span class="dot"></span> דחוף</span>
+          </div>
+
+          <div class="job-wage">
+            <span class="wage-amount">₪35</span>
+            <span class="wage-type">להליכה · ‎30-40 דק'</span>
+          </div>
+
+          <p class="job-desc">
+            לברדור גולדן רגוע ומחונך, צריך מישהו לחיים יום-יום ב-7 הימים הקרובים. אני בנסיעת עבודה. כל 12:00.
+          </p>
+
+          <div class="job-meta">
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/></svg> 5-12 במאי</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 12:00 כל יום</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> בניין 7</span>
+          </div>
+
+          <button class="btn btn-green btn-block">אני מעוניינ/ת</button>
+        </article>
+
+        <!-- ג'וב 3: עזרה בקניות שבת -->
+        <article class="job-card">
+          <div class="job-head">
+            <div class="job-icon job-icon-green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="job-title">עזרה בקניות שישי - מרכול הקרוב</div>
+              <div class="job-poster">פרסמה: רינה (גיל 73) · בניין 1 · לפני 5 שעות</div>
+            </div>
+            <span class="badge badge-blue">החלפת טובות</span>
+          </div>
+
+          <div class="job-wage">
+            <span class="wage-amount" style="font-size: 18px;">⚖️ עוגה ביתית + תה</span>
+            <span class="wage-type" style="margin-bottom: 4px;">החלפה במקום תשלום</span>
+          </div>
+
+          <p class="job-desc">
+            רשימת קניות בינונית (אורז, קוטג', ירקות, חלות). אני מכינה עוגה מעולה לכל מי שעוזר! הגעה ב-9:30, חזרה לפני שבת.
+          </p>
+
+          <div class="job-meta">
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/></svg> שישי 9 במאי</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> 9:30-11:00</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> בניין 1</span>
+          </div>
+
+          <button class="btn btn-soft btn-block">אני שמח/ה לעזור</button>
+        </article>
+
+        <!-- ג'וב 4: עזרה בהובלה -->
+        <article class="job-card">
+          <div class="job-head">
+            <div class="job-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="job-title">2 חזקים להעמסת ארון - שעתיים</div>
+              <div class="job-poster">פרסם: עומר · בניין 4 · לפני 3 שעות</div>
+            </div>
+            <span class="badge badge-green"><span class="dot"></span> פתוח</span>
+          </div>
+
+          <div class="job-wage">
+            <span class="wage-amount">₪80</span>
+            <span class="wage-type">לאדם · ‎עד שעתיים</span>
+          </div>
+
+          <p class="job-desc">
+            עוברים דירה. צריך 2 שכנים חזקים שיעזרו להוריד ארון בגדים מקומה 3 לרכב מטה. רכב כבר מסודר.
+          </p>
+
+          <div class="job-meta">
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/></svg> ראשון 4 במאי</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> 16:00-18:00</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> 1/2 הצטרפו</span>
+          </div>
+
+          <button class="btn btn-green btn-block">להצטרף לעזרה</button>
+        </article>
+
+        <!-- ג'וב 5: שיעורי בית -->
+        <article class="job-card">
+          <div class="job-head">
+            <div class="job-icon job-icon-purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="job-title">עזרה בשיעורי בית — מתמטיקה כיתה ז'</div>
+              <div class="job-poster">פרסמה: אורית · בניין 6 · לפני יומיים</div>
+            </div>
+            <span class="badge badge-green"><span class="dot"></span> פתוח</span>
+          </div>
+
+          <div class="job-wage">
+            <span class="wage-amount">₪70</span>
+            <span class="wage-type">לשעה · פעם בשבוע</span>
+          </div>
+
+          <p class="job-desc">
+            בני בכיתה ז', מתקשה במתמטיקה. מחפשת סטודנט/ית טכניון/אונ' שיגיע פעם בשבוע לתרגול. גמיש בימים.
+          </p>
+
+          <div class="job-meta">
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/></svg> מתמשך</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> שעה שבועית</span>
+            <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> בניין 6</span>
+          </div>
+
+          <button class="btn btn-green btn-block">אני מעוניינ/ת</button>
+        </article>
+      </div>
+
+      <!-- הסבר על המודל -->
+      <div class="card card-padded" style="background: linear-gradient(135deg, var(--leaf), var(--primary-soft)); border: none; margin-bottom: var(--space-7);">
+        <div class="grid grid-3 gap-5">
+          <div>
+            <h4 style="margin-bottom: 8px;">💰 שעתי</h4>
+            <p class="text-muted" style="font-size: 13.5px;">תשלום לשעת עבודה — מתאים למשימות פתוחות (בייביסיטר, הוראה).</p>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 8px;">📦 למשימה</h4>
+            <p class="text-muted" style="font-size: 13.5px;">תשלום קבוע לכל המשימה — מתאים לעבודות מוגדרות (הובלה, ניקוי).</p>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 8px;">🤝 החלפת טובות</h4>
+            <p class="text-muted" style="font-size: 13.5px;">בלי כסף — תמורה אחרת (אוכל, שיעור, השאלה). הכי קהילתי.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <div class="container app-footer-inner">
+        <div>© 2026 כפר-לינק · נבנה בידי הקהילה</div>
+        <nav class="footer-links" aria-label="קישורים">
+          <a href="#">פרטיות</a>
+          <a href="#">תנאי שימוש</a>
+          <a href="mailto:hello@kfar-link.org">צור קשר</a>
+        </nav>
+      </div>
+    </footer>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+    if (!window.KL || !KL.user.isLoggedIn()) { window.location.href = 'onboarding.html'; }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+      });
+    });
+
+    KL.render.loadUserItems('jobs', '.jobs-grid', KL.render.newJobCard);
+
+    document.querySelectorAll('.job-card').forEach((card, idx) => {
+      const title = card.querySelector('.job-title')?.textContent.trim() || ('ג\'וב ' + (idx+1));
+      const jobId = 'job_' + idx;
+
+      const titleEl = card.querySelector('.job-title');
+      if (titleEl) {
+        titleEl.style.cursor = 'pointer';
+        titleEl.addEventListener('click', () => KL.details.showJob(card));
+      }
+
+      const interestBtn = card.querySelector('.btn-block');
+      if (!interestBtn) return;
+
+      const interests = KL.storage.get('myJobs', []);
+      if (interests.find(j => j.id === jobId)) {
+        interestBtn.innerHTML = '✓ הבעת עניין נשלחה';
+        interestBtn.classList.remove('btn-green');
+        interestBtn.classList.add('btn-soft');
+        interestBtn.disabled = true;
+      }
+
+      interestBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (interestBtn.disabled) return;
+        if (KL.actions.expressInterest(jobId, title)) {
+          KL.toast('עניין נרשם!', 'success');
+          interestBtn.innerHTML = '✓ הבעת עניין נשלחה';
+          interestBtn.classList.remove('btn-green');
+          interestBtn.classList.add('btn-soft');
+          interestBtn.disabled = true;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn').forEach(btn => {
+      if (btn.textContent.includes('פרסמו ג\'וב חדש')) {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          KL.modal.open({
+            title: 'פרסום ג\'וב חדש',
+            fields: [
+              { name: 'title', label: 'כותרת', placeholder: 'בייביסיטר לשעתיים', required: true },
+              { name: 'wageType', label: 'סוג תשלום', type: 'select', required: true,
+                options: [
+                  { value: 'hourly', label: 'שעתי' },
+                  { value: 'fixed', label: 'למשימה' },
+                  { value: 'barter', label: 'החלפת טובות' }
+                ]
+              },
+              { name: 'wage', label: 'סכום (₪)', placeholder: '60', required: true },
+              { name: 'when', label: 'מתי?', placeholder: 'שישי 18:00', required: true },
+              { name: 'description', label: 'תיאור', type: 'textarea', placeholder: 'מה צריך לעשות', required: true }
+            ],
+            submitLabel: 'פרסמו',
+            onSubmit: (data, close) => {
+              if (!data.title || !data.description) { KL.toast('שדות חובה חסרים', 'error'); return; }
+              const item = KL.actions.createItem('jobs', data);
+              KL.toast('הג\'וב פורסם!', 'success');
+              close();
+              const grid = document.querySelector('.jobs-grid');
+              if (grid) {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = KL.render.newJobCard(item);
+                grid.insertBefore(wrapper.firstElementChild, grid.firstElementChild);
+              }
+            }
+          });
+        });
+      }
+    });
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    }
+  </script>
+
+</body>
+</html>

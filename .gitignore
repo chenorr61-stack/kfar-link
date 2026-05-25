@@ -1,0 +1,22 @@
+# Streamlit secrets — never commit!
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Google Cloud credentials (in case you saved the JSON locally)
+*.json
+!requirements.json

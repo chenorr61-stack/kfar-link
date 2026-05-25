@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D9488" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <title>הצטרפות לכפר-לינק</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .onboarding-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-5) 0 var(--space-7);
+    }
+    .onboarding-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-7) var(--space-6);
+      box-shadow: var(--shadow-md);
+      max-width: 520px;
+      margin: var(--space-6) auto 0;
+      width: 100%;
+    }
+    .step-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, var(--leaf), var(--primary-soft));
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      margin: 0 auto var(--space-4);
+    }
+    .field-optional {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ink-faint);
+      background: var(--surface-alt);
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      margin-inline-start: 6px;
+    }
+    .login-link {
+      text-align: center;
+      margin-top: var(--space-5);
+      color: var(--ink-soft);
+      font-size: 14px;
+    }
+    .login-link a { color: var(--primary); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="landing.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+        </span>
+        כפר-לינק
+      </a>
+    </div>
+  </header>
+
+  <main class="onboarding-wrap">
+    <div class="container-form">
+
+      <div class="section-head" style="margin-bottom: var(--space-5);">
+        <span class="eyebrow"><span class="dot"></span> הצטרפות לקהילה</span>
+        <h2>בואו נכיר. <span class="gradient-text">דקה אחת</span> ואתם בפנים.</h2>
+      </div>
+
+      <div class="onboarding-card">
+        <div class="step-icon" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+
+        <h3 style="text-align: center; margin-bottom: 8px;">נעים להכיר!</h3>
+        <p class="text-muted" style="text-align: center; margin-bottom: var(--space-6);">שלושה פרטים בסיסיים וזהו.</p>
+
+        <form id="signupForm">
+          <div class="field">
+            <label for="userName">שם משתמש</label>
+            <input class="input" id="userName" name="name" type="text" placeholder="לדוגמה: דנה לוי" autocomplete="name" required />
+            <span class="hint">השם שיופיע ליד ההודעות וההצעות שלך בקהילה.</span>
+          </div>
+
+          <div class="field">
+            <label for="phone">טלפון נייד</label>
+            <div class="input-group">
+              <span class="input-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </span>
+              <input class="input" id="phone" name="phone" type="tel" placeholder="050-1234567" inputmode="tel" autocomplete="tel" required />
+            </div>
+            <span class="hint">לוואטסאפ קהילתי ולהתראות. לא נשתף עם אף אחד.</span>
+          </div>
+
+          <div class="field">
+            <label for="apartment">
+              מספר דירה
+              <span class="field-optional">אופציונלי</span>
+            </label>
+            <input class="input" id="apartment" name="apartment" type="text" placeholder="לדוגמה: 12, או 4א" />
+            <span class="hint">עוזר לשכנים לתאם משלוחים, השאלות וטרמפים.</span>
+          </div>
+
+          <button type="submit" class="btn btn-green btn-block btn-lg" style="margin-top: var(--space-5);">
+            הצטרפו לקהילה
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1)"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+
+        <div class="login-link">
+          לחיצה על "הצטרפו" שומרת את פרטיכם במכשיר זה בלבד.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // אם משתמש כבר רשום - מפנה ישירות לדשבורד
+    if (KL.user.isLoggedIn()) {
+      window.location.href = 'dashboard.html';
+    }
+
+    document.getElementById('signupForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('userName').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const apartment = document.getElementById('apartment').value.trim();
+
+      if (!name) {
+        KL.toast('צריך למלא שם', 'error');
+        document.getElementById('userName').focus();
+        return;
+      }
+      if (!phone || phone.replace(/\D/g, '').length < 9) {
+        KL.toast('צריך למלא טלפון תקין (לפחות 9 ספרות)', 'error');
+        document.getElementById('phone').focus();
+        return;
+      }
+
+      KL.user.save({ name, phone, apartment });
+      KL.toast('ברוכים הבאים לכפר! 🌱', 'success');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+    });
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(()=>{});
+      });
+    }
+  </script>
+
+</body>
+</html>

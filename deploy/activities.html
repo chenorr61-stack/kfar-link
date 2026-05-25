@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0D9488" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <title>פעילויות וטרמפים — כפר-לינק</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    /* פעילות / אירוע */
+    .event-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: flex;
+      transition: all var(--t-base);
+    }
+    .event-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+
+    .event-date {
+      flex: 0 0 90px;
+      background: linear-gradient(180deg, var(--primary-soft), var(--leaf));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      text-align: center;
+      border-inline-end: 1px solid var(--border);
+    }
+    .event-date-month {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--green-deep);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .event-date-day {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1;
+      margin: 4px 0;
+    }
+    .event-date-time {
+      font-size: 11px;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .event-body {
+      flex: 1;
+      padding: var(--space-4) var(--space-5);
+      display: flex;
+      flex-direction: column;
+    }
+    .event-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .event-title { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+    .event-host { font-size: 13px; color: var(--ink-soft); margin-bottom: var(--space-3); }
+    .event-desc { font-size: 14px; color: var(--ink-muted); line-height: 1.55; margin-bottom: var(--space-4); }
+    .event-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      margin-bottom: var(--space-3);
+    }
+    .event-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: auto; }
+
+    /* טרמפ — תצוגה אופקית */
+    .ride-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4) var(--space-5);
+      transition: all var(--t-base);
+    }
+    .ride-card:hover { border-color: var(--border-strong); }
+    .ride-route {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .ride-from, .ride-to { font-weight: 700; color: var(--ink); font-size: 15px; }
+    .ride-arrow { color: var(--ink-soft); flex-shrink: 0; }
+    .ride-details {
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--ink-soft);
+    }
+
+    /* מקומות פנויים — חזותי */
+    .seats {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+    .seat {
+      width: 14px; height: 14px;
+      border-radius: 4px;
+      background: var(--green);
+      transition: all var(--t-base);
+    }
+    .seat.taken { background: var(--border-strong); }
+
+    /* tab content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .events-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+    @media (max-width: 600px) {
+      .event-card { flex-direction: column; }
+      .event-date { flex-direction: row; gap: 14px; padding: var(--space-3) var(--space-4); border-inline-end: none; border-bottom: 1px solid var(--border); flex: none; }
+      .event-date-day { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="dashboard.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
+        </span>
+        כפר-לינק
+      </a>
+      <nav class="nav-links" aria-label="ניווט ראשי">
+        <a href="dashboard.html">הבית שלי</a>
+        <a href="bulk-buy.html">קבוצות רכישה</a>
+        <a href="share-board.html">לוח שיתוף</a>
+        <a href="gig-jobs.html">ג'ובים</a>
+        <a href="activities.html" class="active">פעילויות</a>
+      </nav>
+      <div class="nav-user"><span class="avatar">דנ</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="page-hero-bg" aria-hidden="true"></div>
+      <div class="container page-hero-inner">
+        <div class="flex-between" style="align-items: flex-end; flex-wrap: wrap;">
+          <div>
+            <span class="eyebrow"><span class="dot"></span> מודול: פעילויות וטרמפים</span>
+            <h1 style="font-size: clamp(28px, 4vw, 40px); margin-bottom: 10px;">
+              <span class="gradient-text">קהילה חיה</span> שנפגשת בעולם האמיתי.
+            </h1>
+            <p class="text-muted" style="max-width: 540px; font-size: 16px;">
+              סדנאות, גינות קהילתיות, ארוחות שכונתיות וטרמפים שמחליפים את האוטו השני שלא צריך.
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-soft">פרסמו טרמפ</button>
+            <button class="btn btn-green btn-lg">פעילות חדשה
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <div class="tabs mb-6">
+        <button class="tab active" data-target="events">פעילויות (4)</button>
+        <button class="tab" data-target="rides">טרמפים (3)</button>
+        <button class="tab" data-target="mine">שלי (2)</button>
+      </div>
+
+      <!-- אירועים -->
+      <div class="tab-content active" data-tab="events">
+        <div class="events-grid mb-6">
+
+          <article class="event-card">
+            <div class="event-date">
+              <div class="event-date-month">מאי</div>
+              <div class="event-date-day">8</div>
+              <div class="event-date-time">ה' · 19:00</div>
+            </div>
+            <div class="event-body">
+              <div class="event-head">
+                <div>
+                  <h3 class="event-title">סדנת תיקון רכובים — אופניים, טוסטרים, מנורות</h3>
+                  <div class="event-host">מארגן: אביב (טכנאי קבוצתי) · רחבה מרכזית</div>
+                </div>
+                <span class="badge badge-green"><span class="dot"></span> מתחילים</span>
+              </div>
+              <p class="event-desc">
+                מביאים את הציוד הביתי המקולקל ולומדים יחד איך לתקן. כלים יסופקו במקום. אין הרשמה מראש — בואו עם דבר לתקן.
+              </p>
+              <div class="event-meta">
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 19:00-21:00</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> רחבה מרכזית</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> 4 רשומים · עד 12</span>
+              </div>
+              <div class="event-actions">
+                <button class="btn btn-green">הצטרפו לאירוע</button>
+                <button class="btn btn-ghost btn-sm">פרטים נוספים</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="event-card">
+            <div class="event-date">
+              <div class="event-date-month">מאי</div>
+              <div class="event-date-day">11</div>
+              <div class="event-date-time">א' · 17:30</div>
+            </div>
+            <div class="event-body">
+              <div class="event-head">
+                <div>
+                  <h3 class="event-title">ערב גינה קהילתית — שתילת ירק קיץ</h3>
+                  <div class="event-host">מארגנת: שירה · גינה צפונית</div>
+                </div>
+                <span class="badge badge-blue"><span class="dot"></span> פעיל</span>
+              </div>
+              <p class="event-desc">
+                שתילת עגבניות, מלפפונים ופלפלים לקראת הקיץ. שתילים סופקו מהמועצה. אוכל לכולם בסוף. מתאים גם לילדים.
+              </p>
+              <div class="event-meta">
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 17:30-19:30</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> גינה צפונית</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> 9 רשומים · ‎ללא הגבלה</span>
+              </div>
+              <div class="event-actions">
+                <button class="btn btn-green">הצטרפו לאירוע</button>
+                <button class="btn btn-ghost btn-sm">פרטים נוספים</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="event-card">
+            <div class="event-date">
+              <div class="event-date-month">מאי</div>
+              <div class="event-date-day">15</div>
+              <div class="event-date-time">ה' · 20:00</div>
+            </div>
+            <div class="event-body">
+              <div class="event-head">
+                <div>
+                  <h3 class="event-title">ארוחת שבת קהילתית — פוטלאק</h3>
+                  <div class="event-host">מארגנים: ועדת קהילה · חצר משותפת</div>
+                </div>
+                <span class="badge badge-orange"><span class="dot"></span> 2 מקומות נשארו</span>
+              </div>
+              <p class="event-desc">
+                כל אחד מביא מנה. נציין את מה שתביאו במערכת כדי שלא יהיו 5 חומוסים. כשרות: צמחוני בלבד.
+              </p>
+              <div class="event-meta">
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 20:00-23:00</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> חצר משותפת</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> 28/30 רשומים</span>
+              </div>
+              <div class="event-actions">
+                <button class="btn btn-orange" style="background: var(--orange); color: #fff;">תפסו מקום</button>
+                <button class="btn btn-ghost btn-sm">פרטים נוספים</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="event-card">
+            <div class="event-date">
+              <div class="event-date-month">מאי</div>
+              <div class="event-date-day">22</div>
+              <div class="event-date-time">ה' · 19:30</div>
+            </div>
+            <div class="event-body">
+              <div class="event-head">
+                <div>
+                  <h3 class="event-title">סדנת קומפוסט ביתי — עם דנה הגננת</h3>
+                  <div class="event-host">מארגנת: דנה (אגרונומית) · מועדון הקהילה</div>
+                </div>
+                <span class="badge badge-green"><span class="dot"></span> נפתח להרשמה</span>
+              </div>
+              <p class="event-desc">
+                איך מקטינים 40% מהפסולת הביתית בלי מאמץ? סדנה מעשית עם הדגמה. כל משתתף מקבל פח קומפוסט קטן בסיום.
+              </p>
+              <div class="event-meta">
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> 19:30-21:00</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/></svg> מועדון</span>
+                <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M5 5h14"/></svg> ₪25 לכיסוי החומרים</span>
+              </div>
+              <div class="event-actions">
+                <button class="btn btn-green">הרשמה</button>
+                <button class="btn btn-ghost btn-sm">פרטים נוספים</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- טרמפים -->
+      <div class="tab-content" data-tab="rides">
+        <div class="flex-col gap-3 mb-6">
+
+          <article class="ride-card">
+            <div class="ride-route">
+              <span class="ride-from">הכפר</span>
+              <svg class="ride-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              <span class="ride-to">אונ' תל-אביב</span>
+            </div>
+            <div class="ride-details">
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg> כל בוקר 7:30</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> ‎~30 דק'</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> נהג: עומר</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;">
+                <span class="seats" aria-label="מקומות פנויים">
+                  <span class="seat"></span>
+                  <span class="seat"></span>
+                  <span class="seat taken"></span>
+                  <span class="seat taken"></span>
+                </span>
+                2 פנוי
+              </span>
+            </div>
+            <button class="btn btn-green btn-sm">הצטרפו</button>
+          </article>
+
+          <article class="ride-card">
+            <div class="ride-route">
+              <span class="ride-from">הכפר</span>
+              <svg class="ride-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              <span class="ride-to">קניון איילון</span>
+            </div>
+            <div class="ride-details">
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg> שישי 9 במאי 11:00</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> נהגת: רותם</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;">
+                <span class="seats" aria-label="מקומות פנויים">
+                  <span class="seat"></span>
+                  <span class="seat"></span>
+                  <span class="seat"></span>
+                </span>
+                3 פנויים
+              </span>
+            </div>
+            <button class="btn btn-green btn-sm">הצטרפו</button>
+          </article>
+
+          <article class="ride-card">
+            <div class="ride-route">
+              <span class="ride-from">הכפר</span>
+              <svg class="ride-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1);"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              <span class="ride-to">תחנת רכבת השלום</span>
+            </div>
+            <div class="ride-details">
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg> מחר 6 במאי 6:50</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/></svg> נהג: יוסי</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;">
+                <span class="seats" aria-label="מקומות פנויים">
+                  <span class="seat taken"></span>
+                  <span class="seat taken"></span>
+                  <span class="seat taken"></span>
+                </span>
+                <strong class="text-faint">מלא</strong>
+              </span>
+            </div>
+            <button class="btn btn-ghost btn-sm" disabled>מלא</button>
+          </article>
+        </div>
+      </div>
+
+      <!-- שלי -->
+      <div class="tab-content" data-tab="mine">
+        <div class="empty">
+          <div class="empty-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <h3>אין לך פעילויות פעילות עדיין</h3>
+          <p>גם אם לא הצטרפת לכלום עוד — תמיד אפשר להציץ במה שקורה השבוע, או ליזום משהו חדש.</p>
+          <button class="btn btn-green">צרו פעילות ראשונה</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <div class="container app-footer-inner">
+        <div>© 2026 כפר-לינק · נבנה בידי הקהילה</div>
+        <nav class="footer-links" aria-label="קישורים">
+          <a href="#">פרטיות</a>
+          <a href="#">תנאי שימוש</a>
+          <a href="mailto:hello@kfar-link.org">צור קשר</a>
+        </nav>
+      </div>
+    </footer>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+    if (!window.KL || !KL.user.isLoggedIn()) { window.location.href = 'onboarding.html'; }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.target;
+        if (target) document.querySelector('.tab-content[data-tab="' + target + '"]')?.classList.add('active');
+      });
+    });
+
+    KL.render.loadUserItems('events', '.events-grid', KL.render.newEventCard);
+
+    document.querySelectorAll('.event-card').forEach((card, idx) => {
+      const title = card.querySelector('.event-title')?.textContent.trim() || ('אירוע ' + (idx+1));
+      const eventId = 'event_' + idx;
+
+      const titleEl = card.querySelector('.event-title');
+      if (titleEl) {
+        titleEl.style.cursor = 'pointer';
+        titleEl.addEventListener('click', () => KL.details.showEvent(card));
+      }
+      card.querySelectorAll('.btn').forEach(btn => {
+        if (btn.textContent.trim() === 'פרטים נוספים') {
+          btn.addEventListener('click', (e) => { e.preventDefault(); KL.details.showEvent(card); });
+        }
+      });
+
+      const joinBtns = card.querySelectorAll('.event-actions .btn-green, .event-actions [style*="orange"]');
+      joinBtns.forEach(btn => {
+        const myEvents = KL.storage.get('myEvents', []);
+        if (myEvents.find(e => e.id === eventId)) {
+          btn.innerHTML = '✓ נרשמתם';
+          btn.classList.remove('btn-green');
+          btn.classList.add('btn-soft');
+          btn.disabled = true;
+        }
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (btn.disabled) return;
+          if (KL.actions.joinEvent(eventId, title)) {
+            KL.toast('נרשמתם!', 'success');
+            btn.innerHTML = '✓ נרשמתם';
+            btn.classList.remove('btn-green');
+            btn.classList.add('btn-soft');
+            btn.disabled = true;
+          }
+        });
+      });
+    });
+
+    document.querySelectorAll('.ride-card').forEach((card, idx) => {
+      const from = card.querySelector('.ride-from')?.textContent.trim();
+      const to = card.querySelector('.ride-to')?.textContent.trim();
+      const title = 'טרמפ ' + from + ' → ' + to;
+      const rideId = 'ride_' + idx;
+      const btn = card.querySelector('.btn-green');
+      if (!btn || btn.disabled) return;
+      const myEvents = KL.storage.get('myEvents', []);
+      if (myEvents.find(e => e.id === rideId)) {
+        btn.innerHTML = '✓ אתם בטרמפ';
+        btn.classList.remove('btn-green');
+        btn.classList.add('btn-soft');
+        btn.disabled = true;
+      }
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (btn.disabled) return;
+        if (KL.actions.joinEvent(rideId, title)) {
+          KL.toast('הצטרפתם לטרמפ', 'success');
+          btn.innerHTML = '✓ אתם בטרמפ';
+          btn.classList.remove('btn-green');
+          btn.classList.add('btn-soft');
+          btn.disabled = true;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn').forEach(btn => {
+      const txt = btn.textContent.trim();
+      if (txt.includes('פעילות חדשה') || txt.includes('צרו פעילות ראשונה')) {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          KL.modal.open({
+            title: 'פעילות חדשה',
+            fields: [
+              { name: 'title', label: 'שם', placeholder: 'סדנת תיקון', required: true },
+              { name: 'date', label: 'תאריך', type: 'date', required: true },
+              { name: 'time', label: 'שעה', type: 'time', required: true },
+              { name: 'location', label: 'מיקום', placeholder: 'רחבה מרכזית', required: true },
+              { name: 'description', label: 'תיאור', type: 'textarea', placeholder: 'מה הפעילות', required: true }
+            ],
+            submitLabel: 'פרסמו',
+            onSubmit: (data, close) => {
+              if (!data.title || !data.date) { KL.toast('שדות חובה חסרים', 'error'); return; }
+              const item = KL.actions.createItem('events', data);
+              KL.toast('האירוע פורסם!', 'success');
+              close();
+              const grid = document.querySelector('.events-grid');
+              if (grid) {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = KL.render.newEventCard(item);
+                grid.insertBefore(wrapper.firstElementChild, grid.firstElementChild);
+              }
+            }
+          });
+        });
+      }
+      if (txt === 'פרסמו טרמפ') {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          KL.modal.open({
+            title: 'פרסום טרמפ',
+            fields: [
+              { name: 'from', label: 'מאיפה', value: 'הכפר', required: true },
+              { name: 'to', label: 'לאן', placeholder: 'אונ\' תל-אביב', required: true },
+              { name: 'date', label: 'תאריך', type: 'date', required: true },
+              { name: 'time', label: 'שעה', type: 'time', required: true },
+              { name: 'seats', label: 'מקומות', type: 'number', placeholder: '3', required: true }
+            ],
+            submitLabel: 'פרסמו',
+            onSubmit: (data, close) => {
+              if (!data.from || !data.to) { KL.toast('מאיפה ולאן', 'error'); return; }
+              KL.actions.createItem('rides', data);
+              KL.toast('הטרמפ פורסם!', 'success');
+              close();
+            }
+          });
+        });
+      }
+    });
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    }
+  </script>
+
+</body>
+</html>
