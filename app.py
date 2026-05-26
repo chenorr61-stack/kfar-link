@@ -45,7 +45,8 @@ def _restore_session() -> None:
     try:
         enc = st.query_params.get("s", "")
         if enc:
-            data = _json.loads(_b64.urlsafe_b64decode(enc.encode() + b"==").decode())
+            padding = (-len(enc)) % 4
+            data = _json.loads(_b64.urlsafe_b64decode(enc + "=" * padding).decode())
             if data.get("name") and data.get("phone"):
                 st.session_state.current_user = data
     except Exception:
@@ -1029,10 +1030,761 @@ def render_no_delivery_card_to_streamlit():
     st.markdown(html, unsafe_allow_html=True)
 
 
+
+# ═══════════════════════════════════════════════════════════════════
+#  פרטי עסקה — פונקציה לדף ייחודי
+# ═══════════════════════════════════════════════════════════════════
+
+def _render_bulk_deal_detail(deal: dict, i_deal: int):
+    """
+    מרנדר פרטי עסקה מלאים.
+    נקראת הן מדף ייחודי (_bulk_detail_id) והן ב-show_bulk_buy.
+    """
+    pricing     = calculate_bulk_price(deal)
+    scenarios   = calculate_scenario_prices(deal, pricing)
+    winner      = select_winning_volunteer(deal)
+    deal_status = get_deal_status(deal, pricing)
+
+    sc           = deal_status["code"]
+    retail_p     = deal["price_retail"]
+    target_p     = pricing.get("target_price", retail_p)
+    savings_pct  = round((retail_p - target_p) / retail_p * 100, 1) if retail_p > 0 else 0
+    total_u      = pricing["total_units"]
+    box_size_d   = deal["box_size"]
+    boxes_detail = pricing.get("boxes_detail", [])
+    target_date  = deal.get("target_date", "—")
+    box_is_full  = pricing.get("box_is_full", False) and total_u > 0
+    biz_addr      = deal.get("business_address", "")
+    biz_hours     = deal.get("business_hours", "")
+    biz_phone     = deal.get("business_phone", "")
+    delivery_cost = deal.get("delivery_cost", 0.0)
+    is_no_delivery = deal.get("no_delivery", False)
+
+    sc_a = scenarios["A"]
+    sc_b = scenarios["B"]
+    sc_c = scenarios["C"]
+    hero_p     = sc_b.get("hero_price", 0)
+    hero_net_p = sc_b.get("hero_net_ppu", 0)
+    others_p   = sc_b.get("others_price", 0)
+    trip_pay   = sc_b.get("trip_payment", 0)
+
+    def render_hero_scenario_card(others_price, trip_amount):
+        trip_badge = (
+            f'<div style="margin-top:6px; font-size:0.7em; '
+            f'background:linear-gradient(135deg,#fff3cd,#ffeaa7); '
+            f'border-radius:8px; padding:3px 8px; color:#856404; font-weight:700;">'
+            f'\U0001f697 גיבור מקבל {trip_amount}\u20aa על הנסיעה</div>'
+        )
+        html = (
+            f'<div style="background:#fff; border-radius:16px; padding:12px 10px; '
+            f'text-align:center; direction:rtl; border:1px solid #e0e0e0;">'
+            f'<div style="font-size:1.2em; margin-bottom:2px;">\U0001f9b8</div>'
+            f'<div style="font-weight:600; color:#555; font-size:0.75em; '
+            f'line-height:1.2;">מחיר ליחידה<br>גיבור משלוחים</div>'
+            f'<div style="font-size:1.5em; font-weight:800; color:#17a2b8; '
+            f'margin:4px 0;">{others_price}\u20aa</div>'
+            f'{trip_badge}</div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+
+    # ══════════════════════════════════════════════════
+    #  אזור 1: סטטוס קומפקטי + הוראות למארגן
+    # ══════════════════════════════════════════════════
+    if sc == "closed":
+        cu_victory = st.session_state.get("current_user")
+        is_organizer = (
+            cu_victory
+            and cu_victory["phone"].strip() == deal.get("organizer_phone", "").strip()
+        )
+        if is_organizer:
+            st.success(
+                f"👑 **{deal.get('organizer_name','מארגן')}**, הגיע הזמן לפעול!  \n"
+                f"1️⃣ אשר הזמנה מול הספק ({deal.get('supplier','')})  \n"
+                f"2️⃣ שלח בקשת תשלום Bit/Paybox לכל המשתתפים  \n"
+                f"3️⃣ תאם איסוף/משלוח"
+            )
+    elif sc == "cancelled":
+        st.error(f"{deal_status['icon']} {deal_status['label']}")
+    elif sc == "warning":
+        st.warning(f"{deal_status['icon']} {deal_status['label']}")
+    else:
+        st.info(f"{deal_status['icon']} {deal_status['label']}")
+
+    # ── הארכת דדליין (מארגן בלבד) ──
+    extend_key = f"extend_date_{deal['id']}"
+    if deal_status["code"] in ("conditional", "empty", "cancelled"):
+        if st.button(
+            "📅 ערוך / הארך דדליין (מארגן בלבד)",
+            key=f"extend_btn_{deal['id']}", type="secondary"
+        ):
+            st.session_state[extend_key] = True
+
+    if st.session_state.get(extend_key):
+        cu_extend = st.session_state.get("current_user")
+        org_phone = deal.get("organizer_phone", "")
+        if not cu_extend:
+            st.warning("🔒 יש להזדהות ב-Sidebar כדי לערוך דדליין.")
+        elif cu_extend["phone"].strip() != org_phone.strip():
+            st.error(f"🚫 רק המארגן ({deal.get('organizer_name','—')}) יכול לשנות את הדדליין.")
+        else:
+            with st.form(key=f"extend_form_{deal['id']}"):
+                e_new_date = st.date_input(
+                    "תאריך יעד חדש *",
+                    min_value=date.today() + timedelta(days=1),
+                    value=date.today() + timedelta(days=7),
+                    key=f"ed_{deal['id']}",
+                )
+                ea, eb = st.columns(2)
+                e_confirm = ea.form_submit_button("✅ עדכן דדליין", type="primary", use_container_width=True)
+                e_cancel  = eb.form_submit_button("❌ ביטול", use_container_width=True)
+                if e_confirm:
+                    st.session_state.bulk_deals[i_deal]["target_date"] = e_new_date.isoformat()
+                    if deal_status["code"] == "cancelled":
+                        st.session_state.bulk_deals[i_deal]["status"] = "open"
+                    db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                    st.session_state.pop(extend_key, None)
+                    st.rerun()
+                if e_cancel:
+                    st.session_state.pop(extend_key, None)
+                    st.rerun()
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 2: פרטי העסק
+    # ══════════════════════════════════════════════════
+    biz_addr      = deal.get("business_address", "")
+    biz_hours     = deal.get("business_hours", "")
+    biz_phone     = deal.get("business_phone", "")
+    delivery_cost = deal.get("delivery_cost", 0.0)
+    is_no_delivery = deal.get("no_delivery", False)
+
+    if biz_addr or biz_hours or biz_phone:
+        expander_label = (
+            "🛺 פרטי העסק – איסוף עצמי בלבד" if is_no_delivery
+            else "🛺 פרטי העסק – למתנדב שמגיע לאסוף"
+        )
+        with st.expander(expander_label, expanded=is_no_delivery):
+            if is_no_delivery:
+                st.warning("🚫 **העסק לא מציע משלוח.** נדרש מתנדב שיאסוף את ההזמנה.")
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                if biz_addr:
+                    st.markdown(f"📍 **כתובת:** {biz_addr}")
+                if biz_hours:
+                    st.markdown(f"🕐 **שעות פתיחה:** {biz_hours}")
+                if not is_no_delivery and delivery_cost > 0:
+                    st.markdown(f"🚚 **עלות משלוח חיצוני:** {delivery_cost}₪")
+            with bc2:
+                if biz_phone:
+                    wa_biz = whatsapp_link(
+                        biz_phone,
+                        "היי, אני בא לאסוף הזמנה של קבוצת רכישה מ-Kfar-Link."
+                    )
+                    st.markdown(f"📞 {biz_phone}")
+                    st.markdown(
+                        f"<a class='wa-btn' href='{wa_biz}' target='_blank'>💬 WhatsApp לעסק</a>",
+                        unsafe_allow_html=True,
+                    )
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 3: השוואת תרחישי מחיר
+    #
+    #  no_delivery = True → לא מציגים תרחיש A (משלוח חיצוני),
+    #  במקום זאת מציגים הודעת 'איסוף מהעסק בלבד'.
+    # ══════════════════════════════════════════════════
+    st.markdown("### 💰 השוואת מחירים")
+    is_no_delivery = deal.get("no_delivery", False)
+    sc_a, sc_b, sc_c = scenarios["A"], scenarios["B"], scenarios["C"]
+
+    hero_p      = sc_b.get("hero_price", 0)       # ברוטו = base_ppu
+    hero_net_p  = sc_b.get("hero_net_ppu", 0)     # נטו = אחרי קיזוז נסיעה
+    others_p    = sc_b.get("others_price", 0)
+    trip_pay    = sc_b.get("trip_payment", 0)      # כמה הגיבור מקבל על הנסיעה
+
+    # ── כרטיסי מחיר – כל כרטיס ב-st.markdown נפרד ──
+    # כרטיס הגיבור מציג: המחיר שהאחרים משלמים + תג "גיבור מקבל X₪"
+    def render_hero_scenario_card(others_price, trip_amount):
+        """כרטיס תרחיש גיבור – מחיר לאחרים + תג תשלום נסיעה לגיבור."""
+        trip_badge = (
+            f'<div style="margin-top:6px; font-size:0.7em; '
+            f'background:linear-gradient(135deg,#fff3cd,#ffeaa7); '
+            f'border-radius:8px; padding:3px 8px; color:#856404; font-weight:700;">'
+            f'🚗 גיבור מקבל {trip_amount}₪ על הנסיעה</div>'
+        )
+        html = (
+            f'<div style="background:#fff; border-radius:16px; padding:12px 10px; '
+            f'text-align:center; direction:rtl; border:1px solid #e0e0e0;">'
+            f'<div style="font-size:1.2em; margin-bottom:2px;">🦸</div>'
+            f'<div style="font-weight:600; color:#555; font-size:0.75em; '
+            f'line-height:1.2;">מחיר ליחידה<br>גיבור משלוחים</div>'
+            f'<div style="font-size:1.5em; font-weight:800; color:#17a2b8; '
+            f'margin:4px 0;">{others_price}₪</div>'
+            f'{trip_badge}</div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+    if is_no_delivery:
+        card_col1, card_col2, card_col3 = st.columns(3)
+        with card_col1:
+            render_no_delivery_card_to_streamlit()
+        with card_col2:
+            render_hero_scenario_card(others_p, trip_pay)
+        with card_col3:
+            render_scenario_card_to_streamlit(
+                "💚", "מחיר ליחידה<br>מתנדב בחינם",
+                sc_c["price_per_unit"], "#28a745", star=True)
+    else:
+        card_col1, card_col2, card_col3 = st.columns(3)
+        with card_col1:
+            render_scenario_card_to_streamlit(
+                "🚚", "מחיר ליחידה<br>משלוח חיצוני",
+                sc_a["price_per_unit"], "#e67e22")
+        with card_col2:
+            render_hero_scenario_card(others_p, trip_pay)
+        with card_col3:
+            render_scenario_card_to_streamlit(
+                "💚", "מחיר ליחידה<br>מתנדב בחינם",
+                sc_c["price_per_unit"], "#28a745", star=True)
+
+    # ── אזהרת הוגנות: גיבור יקר ממשלוח חיצוני ──
+    if sc_b.get("hero_more_expensive") and not is_no_delivery:
+        st.warning("⚠️ **שים לב:** במצב זה משלוח חיצוני משתלם יותר לקבוצה מתרחיש גיבור משלוחים.")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 4: ניהול מוביל
+    #
+    #  רק משתתף שכבר הזמין יחידות יכול להתנדב כמוביל.
+    #  היררכיה שנאכפת ברישום:
+    #  1. no_discount → מחליף תמיד את with_discount
+    #  2. with_discount → נכנס רק אם אין מוביל
+    # ══════════════════════════════════════════════════
+    st.markdown("### 🛺 מי מביא את ההזמנה?")
+
+    carrier         = deal.get("carrier")
+    vol_mode_key    = f"vol_mode_{deal['id']}"
+    cancel_mode_key = f"cancel_mode_{deal['id']}"
+
+    # בדיקה: האם המשתמש הנוכחי משתתף בעסקה?
+    cu_vol_check = st.session_state.get("current_user")
+    is_participant_for_vol = False
+    if cu_vol_check and deal["participants"]:
+        is_participant_for_vol = any(
+            p.get("phone", "").strip() == cu_vol_check["phone"].strip()
+            for p in deal["participants"]
+        )
+
+    # ── תצוגת מוביל נוכחי ──
+    if carrier:
+        is_free = carrier.get("type") == "no_discount"
+        c_bg    = "#d4edda" if is_free else "#d1ecf1"
+        c_border = "#28a745" if is_free else "#17a2b8"
+        c_text   = "#155724" if is_free else "#0c5460"
+        c_label  = "💚 מתנדב בחינם" if is_free else "🏄‍♂️ גיבור משלוחים (5% הנחה)"
+        biz_line = f"<br>🛺 לאסוף ב: {biz_addr}" if biz_addr else ""
+        wa_carrier = whatsapp_link(
+            carrier["phone"],
+            f"היי {carrier['name']}, אתה/את המוביל של קבוצת הרכישה '{deal['name']}' ב-Kfar-Link! 🙏"
+        )
+        st.markdown(
+            f"""
+            <div style="background:{c_bg};border-radius:10px;padding:14px;
+                        direction:rtl;border:2px solid {c_border};margin-bottom:10px;">
+                <span style="font-size:1em;font-weight:700;color:{c_text};">{c_label}</span><br>
+                <strong style="font-size:1.1em;">{carrier['name']}</strong>
+                &nbsp;·&nbsp; 📞 {carrier['phone']}
+                {biz_line}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<a class='wa-btn' href='{wa_carrier}' target='_blank'>💬 WhatsApp למוביל</a>",
+            unsafe_allow_html=True,
+        )
+
+        # אם המוביל הוא 'עם הנחה' – משתתף בעסקה יכול להחליפו
+        if not is_free and is_participant_for_vol:
+            st.caption("💡 מוביל 'בחינם' יכול להחליפו ולהוריד את המחיר לכולם.")
+            if st.button(
+                "🟢 אני מתנדב להביא בחינם (ואחליף את המוביל הנוכחי)",
+                key=f"vol_free_override_{deal['id']}", use_container_width=True
+            ):
+                st.session_state[vol_mode_key] = "no_discount"
+                st.rerun()
+
+        # כפתור ביטול התנדבות – מוגן בטלפון
+        if st.button("↩️ בטל התנדבות", key=f"cancel_btn_{deal['id']}", type="secondary"):
+            st.session_state[cancel_mode_key] = True
+            st.rerun()
+
+        if st.session_state.get(cancel_mode_key):
+            # אימות מבוסס current_user – אין צורך להזין טלפון ידנית.
+            # רק המוביל הרשום יכול לבטל את עצמו.
+            cu_cancel = st.session_state.get("current_user")
+            if not cu_cancel:
+                st.warning("🔒 יש להזדהות ב-Sidebar כדי לבטל התנדבות.")
+            elif cu_cancel["phone"].strip() != carrier["phone"].strip():
+                st.error("🚫 רק המוביל הרשום יכול לבטל את עצמו.")
+            else:
+                with st.form(key=f"cancel_form_{deal['id']}"):
+                    st.warning(f"האם לבטל את ההתנדבות של **{carrier['name']}**?")
+                    cf1, cf2 = st.columns(2)
+                    do_cancel = cf1.form_submit_button("✅ אשר ביטול", type="primary", use_container_width=True)
+                    do_abort  = cf2.form_submit_button("❌ חזור", use_container_width=True)
+                    if do_cancel:
+                        st.session_state.bulk_deals[i_deal]["carrier"] = None
+                        db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                        st.session_state.pop(cancel_mode_key, None)
+                        st.rerun()
+                    if do_abort:
+                        st.session_state.pop(cancel_mode_key, None)
+                        st.rerun()
+
+    else:
+        # אין מוביל
+        st.info("🛺 עדיין אין מי שיביא את ההזמנה מהעסק. היה הגיבור! 🏄‍♂️")
+        if is_participant_for_vol:
+            # רק משתתף שכבר הזמין יחידות יכול להתנדב
+            btn1, btn2 = st.columns(2)
+            if btn1.button(
+                "🟢 אני מתנדב להביא\n(בחינם)", key=f"vol_free_{deal['id']}",
+                use_container_width=True, type="primary"
+            ):
+                st.session_state[vol_mode_key] = "no_discount"
+                st.rerun()
+            if btn2.button(
+                "🏄‍♂️ גיבור משלוחים\n(+5% הנחה, עד 20₪)", key=f"vol_hero_{deal['id']}",
+                use_container_width=True
+            ):
+                st.session_state[vol_mode_key] = "with_discount"
+                st.rerun()
+        else:
+            st.caption("💡 כדי להתנדב כמוביל, יש קודם להצטרף לעסקה ולהזמין יחידות.")
+
+    # ── טופס רישום מוביל (נפתח אחרי לחיצה על כפתור, רק למשתתפים) ──
+    if st.session_state.get(vol_mode_key) and is_participant_for_vol:
+        vol_type = st.session_state[vol_mode_key]
+        type_str = (
+            "💚 מתנדב בחינם – הכי טוב לקבוצה! (מחיר C לכולם)"
+            if vol_type == "no_discount"
+            else (f"🏄‍♂️ גיבור משלוחים – {sc_b['others_price']}₪/יח' לאחרים | "
+                  f"אתה מקבל {sc_b['trip_payment']}₪ תשלום נסיעה | "
+                  f"נטו שלך: {sc_b['hero_net_ppu']}₪/יח'")
+        )
+        st.markdown(f"**{type_str}**")
+        # שם + טלפון נמשכים אוטומטית מהמשתמש המחובר
+        cu_carrier = st.session_state.get("current_user")
+        if not cu_carrier:
+            require_login("להתנדב כמוביל")
+            if st.button("❌ ביטול", key=f"vol_back_nologin_{deal['id']}"):
+                st.session_state.pop(vol_mode_key, None)
+                st.rerun()
+        else:
+            st.caption(f"📋 מתנדב/ת: **{cu_carrier['name']}** | 📞 {cu_carrier['phone']}")
+            with st.form(key=f"carrier_form_{deal['id']}"):
+                vs1, vs2 = st.columns(2)
+                v_confirm = vs1.form_submit_button("✅ אשר התנדבות", type="primary", use_container_width=True)
+                v_back    = vs2.form_submit_button("❌ ביטול", use_container_width=True)
+                if v_confirm:
+                    cur = deal.get("carrier")
+                    # כלל היררכיה: no_discount מחליף with_discount;
+                    # with_discount רק אם אין מוביל כלל
+                    can_reg = (
+                        not cur
+                        or vol_type == "no_discount"
+                        or cur.get("type") == "with_discount"
+                    )
+                    if can_reg:
+                        st.session_state.bulk_deals[i_deal]["carrier"] = {
+                            "name":  cu_carrier["name"],
+                            "phone": cu_carrier["phone"],
+                            "type":  vol_type,
+                        }
+                        db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                        st.session_state.pop(vol_mode_key, None)
+                        st.rerun()
+                    else:
+                        st.error("כבר קיים מוביל 'בחינם'. לא ניתן להחליפו.")
+                if v_back:
+                    st.session_state.pop(vol_mode_key, None)
+                    st.rerun()
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 4.5: מחיר נוכחי ליחידה לפי אופי המשלוח
+    #
+    #  אופטימיזציה אוטומטית: אם הגיבור יקר ממשלוח חיצוני,
+    #  המערכת עוברת אוטומטית לתרחיש משלוח חיצוני.
+    # ══════════════════════════════════════════════════
+    carrier_now = deal.get("carrier")
+    auto_switched_to_delivery = False  # דגל: האם עברנו אוטומטית למשלוח
+
+    if carrier_now:
+        if carrier_now.get("type") == "no_discount":
+            # מתנדב בחינם – תמיד הכי טוב
+            active_price = sc_c["price_per_unit"]
+            active_label = "💚 מתנדב בחינם"
+            active_color = "#28a745"
+        elif sc_b.get("hero_more_expensive") and not is_no_delivery:
+            # גיבור יקר ממשלוח חיצוני → מעבר אוטומטי למשלוח
+            active_price = sc_a["price_per_unit"]
+            active_label = "🚚 משלוח חיצוני (אופטימיזציה)"
+            active_color = "#e67e22"
+            auto_switched_to_delivery = True
+        else:
+            # גיבור משלוחים רגיל
+            active_price = others_p
+            active_label = "🦸 גיבור משלוחים"
+            active_color = "#17a2b8"
+    elif is_no_delivery:
+        active_price = None
+        active_label = "🏪 ממתין למוביל"
+        active_color = "#f4511e"
+    else:
+        active_price = sc_a["price_per_unit"]
+        active_label = "🚚 משלוח חיצוני"
+        active_color = "#e67e22"
+
+    if active_price is not None:
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg, #f0faf7, #F0FDFA); '
+            f'border-radius:16px; padding:14px; text-align:center; direction:rtl; '
+            f'border:2px solid {active_color}; margin:8px 0;">'
+            f'<div style="font-size:0.82em; color:#555; margin-bottom:4px;">'
+            f'💰 מחיר נוכחי ליחידה ({active_label})</div>'
+            f'<div style="font-size:2em; font-weight:800; color:{active_color};">'
+            f'{active_price}₪</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        if auto_switched_to_delivery:
+            st.info("🔄 המערכת בחרה במשלוח חיצוני כיוון שהוא משתלם יותר לקבוצה מתרחיש גיבור.")
+    else:
+        st.warning("⏳ המחיר ייקבע ברגע שמוביל יירשם לעסקה")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 5: פרטי מארגן + רשימת משתתפים
+    # ══════════════════════════════════════════════════
+    col_org, col_parts = st.columns([1, 2])
+
+    with col_org:
+        org_name  = deal.get("organizer_name", "—")
+        org_phone = deal.get("organizer_phone", "")
+        st.markdown("**👤 מארגן:**")
+        st.markdown(f"**{org_name}**")
+        if org_phone:
+            wa_org = whatsapp_link(
+                org_phone,
+                f"היי {org_name}, רוצה להצטרף לרכישה של '{deal['name']}' – מה הסכום לשלם?"
+            )
+            st.markdown(
+                f"📞 {org_phone}  \n"
+                f"<a class='wa-btn' href='{wa_org}' target='_blank'>💬 WhatsApp</a>",
+                unsafe_allow_html=True,
+            )
+        if box_is_full:
+            st.success("💳 שלח תשלום\nBit / Paybox")
+
+    with col_parts:
+        st.markdown(f"**👥 משתתפים ({len(deal['participants'])}):**")
+        if not deal["participants"]:
+            st.caption("אין משתתפים עדיין – הצטרף ראשון!")
+        else:
+            carrier_now_parts = deal.get("carrier")
+            carrier_phone = (carrier_now_parts or {}).get("phone", "")
+            carrier_type  = (carrier_now_parts or {}).get("type", "")
+            for p in deal["participants"]:
+                is_hero = (p.get("phone") == carrier_phone
+                           and carrier_phone
+                           and carrier_type == "with_discount")
+                carrier_badge = " 🚗" if p.get("phone") == carrier_phone and carrier_phone else ""
+                qty = p["quantity"]
+                # מחיר ליחידה: גיבור מקבל מחיר מיוחד,
+                # אלא אם המערכת עברה אוטומטית למשלוח חיצוני
+                if active_price is not None:
+                    if is_hero and not auto_switched_to_delivery:
+                        # ══ גיבור משלוחים ══
+                        # מציגים מחיר נטו (אחרי קיזוז תשלום נסיעה)
+                        # ומציינים כמה הוא מקבל על הנסיעה בנפרד
+                        p_price       = hero_net_p   # מחיר נטו ליחידה
+                        gross_total   = round(hero_p * qty, 2)
+                        net_total     = round(p_price * qty, 2)
+                        trip_received = trip_pay      # תשלום נסיעה שמקבל
+                        st.markdown(
+                            f"• **{p['name']}**{carrier_badge} – "
+                            f"{qty} יח' | {p_price}₪ ליחידה (נטו) | "
+                            f"סה\"כ לתשלום: **{net_total}₪** "
+                            f"*(כולל {trip_received}₪ תשלום נסיעה שמקבל)*"
+                        )
+                    else:
+                        # ══ משתתף רגיל ══
+                        p_price = active_price
+                        p_total = round(p_price * qty, 2)
+                        st.markdown(
+                            f"• **{p['name']}**{carrier_badge} – "
+                            f"{qty} יח' | {p_price}₪ ליחידה | "
+                            f"סה\"כ לתשלום: **{p_total}₪**"
+                        )
+                else:
+                    st.markdown(
+                        f"• **{p['name']}**{carrier_badge} – "
+                        f"{qty} יח' | ⏳ ממתין למחיר"
+                    )
+
+        # ── עדכון כמות / יציאה מעסקה למשתתפים קיימים ──
+        # מוצג למשתמש מחובר שכבר נמצא ברשימה – גם כשהארגז מלא (closed)
+        if deal_status["code"] in ("conditional", "closed") and deal["participants"]:
+            cu_upd = st.session_state.get("current_user")
+            # מחפשים את המשתמש המחובר ברשימת המשתתפים
+            p_idx = None
+            if cu_upd:
+                p_idx = next(
+                    (idx for idx, p in enumerate(deal["participants"])
+                     if p.get("phone", "").strip() == cu_upd["phone"].strip()),
+                    None
+                )
+            # מציגים כפתורים רק אם המשתמש אכן משתתף
+            if cu_upd and p_idx is not None:
+                upd_key   = f"upd_qty_{deal['id']}"
+                leave_key = f"leave_deal_{deal['id']}"
+                btn_upd_col, btn_leave_col = st.columns(2)
+                with btn_upd_col:
+                    if st.button(
+                        "✏️ עדכן כמות",
+                        key=f"upd_btn_{deal['id']}", type="secondary",
+                        use_container_width=True
+                    ):
+                        st.session_state[upd_key] = True
+                        st.session_state.pop(leave_key, None)
+                with btn_leave_col:
+                    if st.button(
+                        "🚪 יציאה מעסקה",
+                        key=f"leave_btn_{deal['id']}", type="secondary",
+                        use_container_width=True
+                    ):
+                        st.session_state[leave_key] = True
+                        st.session_state.pop(upd_key, None)
+
+                # ── טופס עדכון כמות ──
+                if st.session_state.get(upd_key):
+                    current_qty = deal["participants"][p_idx]["quantity"]
+                    with st.form(key=f"upd_form_{deal['id']}"):
+                        new_qty = st.number_input(
+                            "כמות יחידות חדשה", min_value=1, max_value=50, value=current_qty,
+                            key=f"uqt_{deal['id']}"
+                        )
+                        ua, ub = st.columns(2)
+                        u_confirm = ua.form_submit_button("✅ עדכן", type="primary", use_container_width=True)
+                        u_cancel  = ub.form_submit_button("❌ ביטול", use_container_width=True)
+                        if u_confirm:
+                            st.session_state.bulk_deals[i_deal]["participants"][p_idx]["quantity"] = int(new_qty)
+                            db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                            st.session_state.pop(upd_key, None)
+                            st.rerun()
+                        if u_cancel:
+                            st.session_state.pop(upd_key, None)
+                            st.rerun()
+
+                # ── טופס יציאה מעסקה ──
+                if st.session_state.get(leave_key):
+                    p_name = deal["participants"][p_idx]["name"]
+                    with st.form(key=f"leave_form_{deal['id']}"):
+                        st.warning(f"האם אתה בטוח שברצונך לצאת מהעסקה, **{p_name}**?")
+                        lf1, lf2 = st.columns(2)
+                        do_leave = lf1.form_submit_button("✅ כן, צא מהעסקה", type="primary", use_container_width=True)
+                        no_leave = lf2.form_submit_button("❌ ביטול", use_container_width=True)
+                        if do_leave:
+                            # הסרת המשתתף מהרשימה
+                            st.session_state.bulk_deals[i_deal]["participants"].pop(p_idx)
+                            # אם המשתתף היה גם המוביל – מבטלים גם את המוביל
+                            cur_carrier = deal.get("carrier")
+                            if cur_carrier and cur_carrier.get("phone", "").strip() == cu_upd["phone"].strip():
+                                st.session_state.bulk_deals[i_deal]["carrier"] = None
+                            db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                            st.session_state.pop(leave_key, None)
+                            st.success(f"👋 {p_name} יצא/ה מהעסקה.")
+                            st.rerun()
+                        if no_leave:
+                            st.session_state.pop(leave_key, None)
+                            st.rerun()
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 6: טופס הצטרפות – קנייה בלבד (נקי)
+    # ══════════════════════════════════════════════════
+    # שומרים על עסקה פתוחה רק כשהיא "מותנית" או "ריקה"
+    # (לא כשסגורה להזמנה, ולא כשבוטלה)
+    if deal_status["code"] in ("conditional", "empty"):
+        # בדיקה: האם המשתמש המחובר כבר בעסקה?
+        cu_join = st.session_state.get("current_user")
+        already_in_deal = False
+        if cu_join:
+            existing_phones = [p.get("phone","").strip() for p in deal["participants"]]
+            already_in_deal = cu_join["phone"].strip() in existing_phones
+
+        if already_in_deal:
+            # המשתמש כבר בעסקה – לא מציגים טופס הצטרפות
+            st.info(f"✅ **{cu_join['name']}**, את/ה כבר בעסקה הזו. השתמש/י בכפתורי 'עדכן כמות' או 'יציאה מעסקה' למעלה.")
+        else:
+            st.markdown("**🙋 הצטרף לעסקה:**")
+            if not require_login("להצטרף לעסקה"):
+                pass  # require_login כבר הציג הודעה
+            else:
+                st.caption(f"👤 מצטרף כ: **{cu_join['name']}** | 📞 {cu_join['phone']}")
+                with st.form(key=f"join_{deal['id']}"):
+                    j_qty = st.number_input(
+                        "כמות יחידות", min_value=1, max_value=50, value=1,
+                        key=f"jq_{deal['id']}"
+                    )
+                    submitted = st.form_submit_button("הצטרף לעסקה 🚀", use_container_width=True)
+                    if submitted:
+                        # need_expiry = תאריך יעד העסקה (אוטומטי, לא ידני)
+                        auto_expiry = deal.get("target_date", (date.today() + timedelta(days=14)).isoformat())
+                        existing = st.session_state.bulk_deals[i_deal].setdefault("participants", []) or []
+                        existing.append({
+                            "id":          gen_id(),
+                            "name":        cu_join["name"],
+                            "phone":       cu_join["phone"],
+                            "quantity":    int(j_qty),
+                            "need_expiry": auto_expiry,
+                        })
+                        st.session_state.bulk_deals[i_deal]["participants"] = existing
+                        db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                        st.success(f"✅ {cu_join['name']} הצטרף לעסקה!")
+                        st.rerun()
+    elif deal_status["code"] == "closed":
+        # הודעה למשתתף – מה עליו לעשות עכשיו
+        org_name  = deal.get("organizer_name", "המארגן")
+        org_phone = deal.get("organizer_phone", "")
+        wa_pay = whatsapp_link(
+            org_phone,
+            f"היי {org_name}! אני מוכן/ה לשלם על ההזמנה של '{deal['name']}' 💰"
+        ) if org_phone else ""
+        pay_btn = f"&nbsp; <a class='wa-btn' href='{wa_pay}' target='_blank'>💬 שלח ל-{org_name}</a>" if wa_pay else ""
+        st.markdown(
+            f"""
+            <div style="background:#d4edda;border-radius:10px;padding:14px 18px;
+                        direction:rtl;border:1px solid #28a745;margin-bottom:8px;">
+                🎉 <strong>הארגז מלא!</strong> העסקה סגורה להצטרפויות חדשות.<br>
+                💳 שלחו תשלום של <strong>{target_p}₪ ליחידה</strong>
+                ל-<strong>{org_name}</strong> דרך Bit / Paybox.
+                {pay_btn}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif deal_status["code"] == "cancelled":
+        st.error(
+            "🔴 **העסקה בוטלה.** הדדליין עבר לפני שהארגז התמלא.  \n"
+            "המארגן יכול להאריך את הדדליין ולהחיות את העסקה."
+        )
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════
+    #  אזור 7: מערכת תגובות (שאלות ותשובות)
+    # ══════════════════════════════════════════════════
+    st.markdown("**💬 שאלות ותגובות:**")
+
+    # הצגת תגובות קיימות
+    comments = deal.get("comments", [])
+    if not comments:
+        st.caption("אין תגובות עדיין. שאל/י ראשון/ה!")
+    else:
+        for cmt in comments:
+            ts = cmt.get("created_at", "")[:16].replace("T", " ")
+            st.markdown(
+                f"""
+                <div style="background:#f8f9fa;border-radius:8px;padding:8px 12px;
+                            margin-bottom:6px;direction:rtl;border-right:3px solid #dee2e6;">
+                    <strong style="color:#333;">{cmt['author']}</strong>
+                    <span style="color:#aaa;font-size:0.78em;margin-right:8px;">{ts}</span><br>
+                    <span style="color:#555;">{cmt['text']}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # טופס הוספת תגובה – שם הכותב נמשך אוטומטית מה-current_user
+    cu_cmt = st.session_state.get("current_user")
+    if not require_login("להוסיף תגובה"):
+        pass  # require_login הציג הודעה
+    else:
+        with st.form(key=f"cmt_form_{deal['id']}"):
+            cmt_text = st.text_input("תגובה / שאלה *", key=f"cmt_t_{deal['id']}")
+            if st.form_submit_button("שלח תגובה 💬", use_container_width=True):
+                if cmt_text:
+                    new_cmt = {
+                        "id":         gen_id(),
+                        "author":     cu_cmt["name"],
+                        "text":       cmt_text.strip(),
+                        "created_at": datetime.now().isoformat(),
+                    }
+                    existing_cmts = st.session_state.bulk_deals[i_deal].get("comments") or []
+                    existing_cmts.append(new_cmt)
+                    st.session_state.bulk_deals[i_deal]["comments"] = existing_cmts
+                    db.update_bulk_deal(st.session_state.bulk_deals[i_deal])
+                    st.rerun()
+                else:
+                    st.error("נא למלא תגובה.")
+
+
+    # ── מחיקה — המארגן בלבד ──────────────────────────────────────────
+    cu_del = st.session_state.get("current_user")
+    if cu_del and cu_del["phone"].strip() == deal.get("organizer_phone", "").strip():
+        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+        st.divider()
+        _del_key = f"_confirm_del_bulk_{deal['id']}"
+        if st.session_state.get(_del_key):
+            st.warning("⚠️ למחוק את העסקה לצמיתות? כל המשתתפים יוסרו.")
+            c1, c2 = st.columns(2)
+            if c1.button("🗑️ כן, מחק", key=f"del_bulk_yes_{deal['id']}", type="primary", use_container_width=True):
+                db.delete_bulk_deal(deal["id"])
+                db.invalidate_cache()
+                st.session_state.bulk_deals = db.get_bulk_deals()
+                st.session_state.pop("_bulk_detail_id", None)
+                st.session_state.pop(_del_key, None)
+                st.rerun()
+            if c2.button("ביטול", key=f"del_bulk_no_{deal['id']}", use_container_width=True):
+                st.session_state.pop(_del_key, None)
+                st.rerun()
+        else:
+            if st.button("🗑️ בטל/מחק עסקה", key=f"del_bulk_{deal['id']}", use_container_width=True):
+                st.session_state[_del_key] = True
+                st.rerun()
+
 def show_bulk_buy():
     """מסך קבוצת הרכישה."""
     st.title("🛒 קבוצת רכישה")
     st.caption("קנו יחד, שלמו פחות. כל שכן שמצטרף מוריד את המחיר! 🏄‍♂️")
+
+    # ── ניתוב לדף עסקה ייחודי ──────────────────────────────────────
+    _detail_id = st.session_state.get("_bulk_detail_id")
+    if _detail_id:
+        if st.button("← חזור לרשימת העסקאות", key="back_from_bulk_detail"):
+            st.session_state.pop("_bulk_detail_id", None)
+            st.rerun()
+        _target = next((d for d in st.session_state.bulk_deals if d["id"] == _detail_id), None)
+        if not _target:
+            st.warning("העסקה לא נמצאה.")
+            st.session_state.pop("_bulk_detail_id", None)
+            st.rerun()
+            return
+        _i_target = next(i for i, d in enumerate(st.session_state.bulk_deals) if d["id"] == _detail_id)
+        st.markdown(f"### {_target.get('product_emoji','📦')} {_target['name']}")
+        st.divider()
+        _render_bulk_deal_detail(_target, _i_target)
+        return
 
     # ══════════════════════════════════════════════════════════════
     #  אזור דחיפות ראשי – עסקאות שפוגות ב-48 השעות הקרובות
@@ -1270,673 +2022,18 @@ def show_bulk_buy():
                 )
 
                 # ── כפתור 'לפרטים והצטרפות' – מפעיל session_state toggle ──
-                detail_key = f"show_detail_{deal['id']}"
                 if st.button(
-                    "🔎 לפרטים והצטרפות" if not st.session_state.get(detail_key) else "🔼 הסתר פרטים",
+                    "🔎 לפרטים והצטרפות",
                     key=f"detail_btn_{deal['id']}",
                     use_container_width=True,
-                    type="primary" if not st.session_state.get(detail_key) else "secondary",
+                    type="primary",
                 ):
-                    st.session_state[detail_key] = not st.session_state.get(detail_key, False)
+                    st.session_state["_bulk_detail_id"] = deal["id"]
                     st.rerun()
 
                 # ══════════════════════════════════════════════════
                 #  אזור מפורט – מוצג רק בלחיצה על הכפתור
                 # ══════════════════════════════════════════════════
-                if st.session_state.get(detail_key):
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 1: סטטוס קומפקטי + הוראות למארגן
-                    # ══════════════════════════════════════════════════
-                    if sc == "closed":
-                        cu_victory = st.session_state.get("current_user")
-                        is_organizer = (
-                            cu_victory
-                            and cu_victory["phone"].strip() == deal.get("organizer_phone", "").strip()
-                        )
-                        if is_organizer:
-                            st.success(
-                                f"👑 **{deal.get('organizer_name','מארגן')}**, הגיע הזמן לפעול!  \n"
-                                f"1️⃣ אשר הזמנה מול הספק ({deal.get('supplier','')})  \n"
-                                f"2️⃣ שלח בקשת תשלום Bit/Paybox לכל המשתתפים  \n"
-                                f"3️⃣ תאם איסוף/משלוח"
-                            )
-                    elif sc == "cancelled":
-                        st.error(f"{deal_status['icon']} {deal_status['label']}")
-                    elif sc == "warning":
-                        st.warning(f"{deal_status['icon']} {deal_status['label']}")
-                    else:
-                        st.info(f"{deal_status['icon']} {deal_status['label']}")
-
-                    # ── הארכת דדליין (מארגן בלבד) ──
-                    extend_key = f"extend_date_{deal['id']}"
-                    if deal_status["code"] in ("conditional", "empty", "cancelled"):
-                        if st.button(
-                            "📅 ערוך / הארך דדליין (מארגן בלבד)",
-                            key=f"extend_btn_{deal['id']}", type="secondary"
-                        ):
-                            st.session_state[extend_key] = True
-
-                    if st.session_state.get(extend_key):
-                        cu_extend = st.session_state.get("current_user")
-                        org_phone = deal.get("organizer_phone", "")
-                        if not cu_extend:
-                            st.warning("🔒 יש להזדהות ב-Sidebar כדי לערוך דדליין.")
-                        elif cu_extend["phone"].strip() != org_phone.strip():
-                            st.error(f"🚫 רק המארגן ({deal.get('organizer_name','—')}) יכול לשנות את הדדליין.")
-                        else:
-                            with st.form(key=f"extend_form_{deal['id']}"):
-                                e_new_date = st.date_input(
-                                    "תאריך יעד חדש *",
-                                    min_value=date.today() + timedelta(days=1),
-                                    value=date.today() + timedelta(days=7),
-                                    key=f"ed_{deal['id']}",
-                                )
-                                ea, eb = st.columns(2)
-                                e_confirm = ea.form_submit_button("✅ עדכן דדליין", type="primary", use_container_width=True)
-                                e_cancel  = eb.form_submit_button("❌ ביטול", use_container_width=True)
-                                if e_confirm:
-                                    st.session_state.bulk_deals[i]["target_date"] = e_new_date.isoformat()
-                                    if deal_status["code"] == "cancelled":
-                                        st.session_state.bulk_deals[i]["status"] = "open"
-                                    db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                    st.session_state.pop(extend_key, None)
-                                    st.rerun()
-                                if e_cancel:
-                                    st.session_state.pop(extend_key, None)
-                                    st.rerun()
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 2: פרטי העסק
-                    # ══════════════════════════════════════════════════
-                    biz_addr      = deal.get("business_address", "")
-                    biz_hours     = deal.get("business_hours", "")
-                    biz_phone     = deal.get("business_phone", "")
-                    delivery_cost = deal.get("delivery_cost", 0.0)
-                    is_no_delivery = deal.get("no_delivery", False)
-
-                    if biz_addr or biz_hours or biz_phone:
-                        expander_label = (
-                            "🛺 פרטי העסק – איסוף עצמי בלבד" if is_no_delivery
-                            else "🛺 פרטי העסק – למתנדב שמגיע לאסוף"
-                        )
-                        with st.expander(expander_label, expanded=is_no_delivery):
-                            if is_no_delivery:
-                                st.warning("🚫 **העסק לא מציע משלוח.** נדרש מתנדב שיאסוף את ההזמנה.")
-                            bc1, bc2 = st.columns(2)
-                            with bc1:
-                                if biz_addr:
-                                    st.markdown(f"📍 **כתובת:** {biz_addr}")
-                                if biz_hours:
-                                    st.markdown(f"🕐 **שעות פתיחה:** {biz_hours}")
-                                if not is_no_delivery and delivery_cost > 0:
-                                    st.markdown(f"🚚 **עלות משלוח חיצוני:** {delivery_cost}₪")
-                            with bc2:
-                                if biz_phone:
-                                    wa_biz = whatsapp_link(
-                                        biz_phone,
-                                        "היי, אני בא לאסוף הזמנה של קבוצת רכישה מ-Kfar-Link."
-                                    )
-                                    st.markdown(f"📞 {biz_phone}")
-                                    st.markdown(
-                                        f"<a class='wa-btn' href='{wa_biz}' target='_blank'>💬 WhatsApp לעסק</a>",
-                                        unsafe_allow_html=True,
-                                    )
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 3: השוואת תרחישי מחיר
-                    #
-                    #  no_delivery = True → לא מציגים תרחיש A (משלוח חיצוני),
-                    #  במקום זאת מציגים הודעת 'איסוף מהעסק בלבד'.
-                    # ══════════════════════════════════════════════════
-                    st.markdown("### 💰 השוואת מחירים")
-                    is_no_delivery = deal.get("no_delivery", False)
-                    sc_a, sc_b, sc_c = scenarios["A"], scenarios["B"], scenarios["C"]
-
-                    hero_p      = sc_b.get("hero_price", 0)       # ברוטו = base_ppu
-                    hero_net_p  = sc_b.get("hero_net_ppu", 0)     # נטו = אחרי קיזוז נסיעה
-                    others_p    = sc_b.get("others_price", 0)
-                    trip_pay    = sc_b.get("trip_payment", 0)      # כמה הגיבור מקבל על הנסיעה
-
-                    # ── כרטיסי מחיר – כל כרטיס ב-st.markdown נפרד ──
-                    # כרטיס הגיבור מציג: המחיר שהאחרים משלמים + תג "גיבור מקבל X₪"
-                    def render_hero_scenario_card(others_price, trip_amount):
-                        """כרטיס תרחיש גיבור – מחיר לאחרים + תג תשלום נסיעה לגיבור."""
-                        trip_badge = (
-                            f'<div style="margin-top:6px; font-size:0.7em; '
-                            f'background:linear-gradient(135deg,#fff3cd,#ffeaa7); '
-                            f'border-radius:8px; padding:3px 8px; color:#856404; font-weight:700;">'
-                            f'🚗 גיבור מקבל {trip_amount}₪ על הנסיעה</div>'
-                        )
-                        html = (
-                            f'<div style="background:#fff; border-radius:16px; padding:12px 10px; '
-                            f'text-align:center; direction:rtl; border:1px solid #e0e0e0;">'
-                            f'<div style="font-size:1.2em; margin-bottom:2px;">🦸</div>'
-                            f'<div style="font-weight:600; color:#555; font-size:0.75em; '
-                            f'line-height:1.2;">מחיר ליחידה<br>גיבור משלוחים</div>'
-                            f'<div style="font-size:1.5em; font-weight:800; color:#17a2b8; '
-                            f'margin:4px 0;">{others_price}₪</div>'
-                            f'{trip_badge}</div>'
-                        )
-                        st.markdown(html, unsafe_allow_html=True)
-
-                    if is_no_delivery:
-                        card_col1, card_col2, card_col3 = st.columns(3)
-                        with card_col1:
-                            render_no_delivery_card_to_streamlit()
-                        with card_col2:
-                            render_hero_scenario_card(others_p, trip_pay)
-                        with card_col3:
-                            render_scenario_card_to_streamlit(
-                                "💚", "מחיר ליחידה<br>מתנדב בחינם",
-                                sc_c["price_per_unit"], "#28a745", star=True)
-                    else:
-                        card_col1, card_col2, card_col3 = st.columns(3)
-                        with card_col1:
-                            render_scenario_card_to_streamlit(
-                                "🚚", "מחיר ליחידה<br>משלוח חיצוני",
-                                sc_a["price_per_unit"], "#e67e22")
-                        with card_col2:
-                            render_hero_scenario_card(others_p, trip_pay)
-                        with card_col3:
-                            render_scenario_card_to_streamlit(
-                                "💚", "מחיר ליחידה<br>מתנדב בחינם",
-                                sc_c["price_per_unit"], "#28a745", star=True)
-
-                    # ── אזהרת הוגנות: גיבור יקר ממשלוח חיצוני ──
-                    if sc_b.get("hero_more_expensive") and not is_no_delivery:
-                        st.warning("⚠️ **שים לב:** במצב זה משלוח חיצוני משתלם יותר לקבוצה מתרחיש גיבור משלוחים.")
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 4: ניהול מוביל
-                    #
-                    #  רק משתתף שכבר הזמין יחידות יכול להתנדב כמוביל.
-                    #  היררכיה שנאכפת ברישום:
-                    #  1. no_discount → מחליף תמיד את with_discount
-                    #  2. with_discount → נכנס רק אם אין מוביל
-                    # ══════════════════════════════════════════════════
-                    st.markdown("### 🛺 מי מביא את ההזמנה?")
-
-                    carrier         = deal.get("carrier")
-                    vol_mode_key    = f"vol_mode_{deal['id']}"
-                    cancel_mode_key = f"cancel_mode_{deal['id']}"
-
-                    # בדיקה: האם המשתמש הנוכחי משתתף בעסקה?
-                    cu_vol_check = st.session_state.get("current_user")
-                    is_participant_for_vol = False
-                    if cu_vol_check and deal["participants"]:
-                        is_participant_for_vol = any(
-                            p.get("phone", "").strip() == cu_vol_check["phone"].strip()
-                            for p in deal["participants"]
-                        )
-
-                    # ── תצוגת מוביל נוכחי ──
-                    if carrier:
-                        is_free = carrier.get("type") == "no_discount"
-                        c_bg    = "#d4edda" if is_free else "#d1ecf1"
-                        c_border = "#28a745" if is_free else "#17a2b8"
-                        c_text   = "#155724" if is_free else "#0c5460"
-                        c_label  = "💚 מתנדב בחינם" if is_free else "🏄‍♂️ גיבור משלוחים (5% הנחה)"
-                        biz_line = f"<br>🛺 לאסוף ב: {biz_addr}" if biz_addr else ""
-                        wa_carrier = whatsapp_link(
-                            carrier["phone"],
-                            f"היי {carrier['name']}, אתה/את המוביל של קבוצת הרכישה '{deal['name']}' ב-Kfar-Link! 🙏"
-                        )
-                        st.markdown(
-                            f"""
-                            <div style="background:{c_bg};border-radius:10px;padding:14px;
-                                        direction:rtl;border:2px solid {c_border};margin-bottom:10px;">
-                                <span style="font-size:1em;font-weight:700;color:{c_text};">{c_label}</span><br>
-                                <strong style="font-size:1.1em;">{carrier['name']}</strong>
-                                &nbsp;·&nbsp; 📞 {carrier['phone']}
-                                {biz_line}
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown(
-                            f"<a class='wa-btn' href='{wa_carrier}' target='_blank'>💬 WhatsApp למוביל</a>",
-                            unsafe_allow_html=True,
-                        )
-
-                        # אם המוביל הוא 'עם הנחה' – משתתף בעסקה יכול להחליפו
-                        if not is_free and is_participant_for_vol:
-                            st.caption("💡 מוביל 'בחינם' יכול להחליפו ולהוריד את המחיר לכולם.")
-                            if st.button(
-                                "🟢 אני מתנדב להביא בחינם (ואחליף את המוביל הנוכחי)",
-                                key=f"vol_free_override_{deal['id']}", use_container_width=True
-                            ):
-                                st.session_state[vol_mode_key] = "no_discount"
-                                st.rerun()
-
-                        # כפתור ביטול התנדבות – מוגן בטלפון
-                        if st.button("↩️ בטל התנדבות", key=f"cancel_btn_{deal['id']}", type="secondary"):
-                            st.session_state[cancel_mode_key] = True
-                            st.rerun()
-
-                        if st.session_state.get(cancel_mode_key):
-                            # אימות מבוסס current_user – אין צורך להזין טלפון ידנית.
-                            # רק המוביל הרשום יכול לבטל את עצמו.
-                            cu_cancel = st.session_state.get("current_user")
-                            if not cu_cancel:
-                                st.warning("🔒 יש להזדהות ב-Sidebar כדי לבטל התנדבות.")
-                            elif cu_cancel["phone"].strip() != carrier["phone"].strip():
-                                st.error("🚫 רק המוביל הרשום יכול לבטל את עצמו.")
-                            else:
-                                with st.form(key=f"cancel_form_{deal['id']}"):
-                                    st.warning(f"האם לבטל את ההתנדבות של **{carrier['name']}**?")
-                                    cf1, cf2 = st.columns(2)
-                                    do_cancel = cf1.form_submit_button("✅ אשר ביטול", type="primary", use_container_width=True)
-                                    do_abort  = cf2.form_submit_button("❌ חזור", use_container_width=True)
-                                    if do_cancel:
-                                        st.session_state.bulk_deals[i]["carrier"] = None
-                                        db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                        st.session_state.pop(cancel_mode_key, None)
-                                        st.rerun()
-                                    if do_abort:
-                                        st.session_state.pop(cancel_mode_key, None)
-                                        st.rerun()
-
-                    else:
-                        # אין מוביל
-                        st.info("🛺 עדיין אין מי שיביא את ההזמנה מהעסק. היה הגיבור! 🏄‍♂️")
-                        if is_participant_for_vol:
-                            # רק משתתף שכבר הזמין יחידות יכול להתנדב
-                            btn1, btn2 = st.columns(2)
-                            if btn1.button(
-                                "🟢 אני מתנדב להביא\n(בחינם)", key=f"vol_free_{deal['id']}",
-                                use_container_width=True, type="primary"
-                            ):
-                                st.session_state[vol_mode_key] = "no_discount"
-                                st.rerun()
-                            if btn2.button(
-                                "🏄‍♂️ גיבור משלוחים\n(+5% הנחה, עד 20₪)", key=f"vol_hero_{deal['id']}",
-                                use_container_width=True
-                            ):
-                                st.session_state[vol_mode_key] = "with_discount"
-                                st.rerun()
-                        else:
-                            st.caption("💡 כדי להתנדב כמוביל, יש קודם להצטרף לעסקה ולהזמין יחידות.")
-
-                    # ── טופס רישום מוביל (נפתח אחרי לחיצה על כפתור, רק למשתתפים) ──
-                    if st.session_state.get(vol_mode_key) and is_participant_for_vol:
-                        vol_type = st.session_state[vol_mode_key]
-                        type_str = (
-                            "💚 מתנדב בחינם – הכי טוב לקבוצה! (מחיר C לכולם)"
-                            if vol_type == "no_discount"
-                            else (f"🏄‍♂️ גיבור משלוחים – {sc_b['others_price']}₪/יח' לאחרים | "
-                                  f"אתה מקבל {sc_b['trip_payment']}₪ תשלום נסיעה | "
-                                  f"נטו שלך: {sc_b['hero_net_ppu']}₪/יח'")
-                        )
-                        st.markdown(f"**{type_str}**")
-                        # שם + טלפון נמשכים אוטומטית מהמשתמש המחובר
-                        cu_carrier = st.session_state.get("current_user")
-                        if not cu_carrier:
-                            require_login("להתנדב כמוביל")
-                            if st.button("❌ ביטול", key=f"vol_back_nologin_{deal['id']}"):
-                                st.session_state.pop(vol_mode_key, None)
-                                st.rerun()
-                        else:
-                            st.caption(f"📋 מתנדב/ת: **{cu_carrier['name']}** | 📞 {cu_carrier['phone']}")
-                            with st.form(key=f"carrier_form_{deal['id']}"):
-                                vs1, vs2 = st.columns(2)
-                                v_confirm = vs1.form_submit_button("✅ אשר התנדבות", type="primary", use_container_width=True)
-                                v_back    = vs2.form_submit_button("❌ ביטול", use_container_width=True)
-                                if v_confirm:
-                                    cur = deal.get("carrier")
-                                    # כלל היררכיה: no_discount מחליף with_discount;
-                                    # with_discount רק אם אין מוביל כלל
-                                    can_reg = (
-                                        not cur
-                                        or vol_type == "no_discount"
-                                        or cur.get("type") == "with_discount"
-                                    )
-                                    if can_reg:
-                                        st.session_state.bulk_deals[i]["carrier"] = {
-                                            "name":  cu_carrier["name"],
-                                            "phone": cu_carrier["phone"],
-                                            "type":  vol_type,
-                                        }
-                                        db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                        st.session_state.pop(vol_mode_key, None)
-                                        st.rerun()
-                                    else:
-                                        st.error("כבר קיים מוביל 'בחינם'. לא ניתן להחליפו.")
-                                if v_back:
-                                    st.session_state.pop(vol_mode_key, None)
-                                    st.rerun()
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 4.5: מחיר נוכחי ליחידה לפי אופי המשלוח
-                    #
-                    #  אופטימיזציה אוטומטית: אם הגיבור יקר ממשלוח חיצוני,
-                    #  המערכת עוברת אוטומטית לתרחיש משלוח חיצוני.
-                    # ══════════════════════════════════════════════════
-                    carrier_now = deal.get("carrier")
-                    auto_switched_to_delivery = False  # דגל: האם עברנו אוטומטית למשלוח
-
-                    if carrier_now:
-                        if carrier_now.get("type") == "no_discount":
-                            # מתנדב בחינם – תמיד הכי טוב
-                            active_price = sc_c["price_per_unit"]
-                            active_label = "💚 מתנדב בחינם"
-                            active_color = "#28a745"
-                        elif sc_b.get("hero_more_expensive") and not is_no_delivery:
-                            # גיבור יקר ממשלוח חיצוני → מעבר אוטומטי למשלוח
-                            active_price = sc_a["price_per_unit"]
-                            active_label = "🚚 משלוח חיצוני (אופטימיזציה)"
-                            active_color = "#e67e22"
-                            auto_switched_to_delivery = True
-                        else:
-                            # גיבור משלוחים רגיל
-                            active_price = others_p
-                            active_label = "🦸 גיבור משלוחים"
-                            active_color = "#17a2b8"
-                    elif is_no_delivery:
-                        active_price = None
-                        active_label = "🏪 ממתין למוביל"
-                        active_color = "#f4511e"
-                    else:
-                        active_price = sc_a["price_per_unit"]
-                        active_label = "🚚 משלוח חיצוני"
-                        active_color = "#e67e22"
-
-                    if active_price is not None:
-                        st.markdown(
-                            f'<div style="background:linear-gradient(135deg, #f0faf7, #F0FDFA); '
-                            f'border-radius:16px; padding:14px; text-align:center; direction:rtl; '
-                            f'border:2px solid {active_color}; margin:8px 0;">'
-                            f'<div style="font-size:0.82em; color:#555; margin-bottom:4px;">'
-                            f'💰 מחיר נוכחי ליחידה ({active_label})</div>'
-                            f'<div style="font-size:2em; font-weight:800; color:{active_color};">'
-                            f'{active_price}₪</div>'
-                            f'</div>',
-                            unsafe_allow_html=True,
-                        )
-                        if auto_switched_to_delivery:
-                            st.info("🔄 המערכת בחרה במשלוח חיצוני כיוון שהוא משתלם יותר לקבוצה מתרחיש גיבור.")
-                    else:
-                        st.warning("⏳ המחיר ייקבע ברגע שמוביל יירשם לעסקה")
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 5: פרטי מארגן + רשימת משתתפים
-                    # ══════════════════════════════════════════════════
-                    col_org, col_parts = st.columns([1, 2])
-
-                    with col_org:
-                        org_name  = deal.get("organizer_name", "—")
-                        org_phone = deal.get("organizer_phone", "")
-                        st.markdown("**👤 מארגן:**")
-                        st.markdown(f"**{org_name}**")
-                        if org_phone:
-                            wa_org = whatsapp_link(
-                                org_phone,
-                                f"היי {org_name}, רוצה להצטרף לרכישה של '{deal['name']}' – מה הסכום לשלם?"
-                            )
-                            st.markdown(
-                                f"📞 {org_phone}  \n"
-                                f"<a class='wa-btn' href='{wa_org}' target='_blank'>💬 WhatsApp</a>",
-                                unsafe_allow_html=True,
-                            )
-                        if box_is_full:
-                            st.success("💳 שלח תשלום\nBit / Paybox")
-
-                    with col_parts:
-                        st.markdown(f"**👥 משתתפים ({len(deal['participants'])}):**")
-                        if not deal["participants"]:
-                            st.caption("אין משתתפים עדיין – הצטרף ראשון!")
-                        else:
-                            carrier_now_parts = deal.get("carrier")
-                            carrier_phone = (carrier_now_parts or {}).get("phone", "")
-                            carrier_type  = (carrier_now_parts or {}).get("type", "")
-                            for p in deal["participants"]:
-                                is_hero = (p.get("phone") == carrier_phone
-                                           and carrier_phone
-                                           and carrier_type == "with_discount")
-                                carrier_badge = " 🚗" if p.get("phone") == carrier_phone and carrier_phone else ""
-                                qty = p["quantity"]
-                                # מחיר ליחידה: גיבור מקבל מחיר מיוחד,
-                                # אלא אם המערכת עברה אוטומטית למשלוח חיצוני
-                                if active_price is not None:
-                                    if is_hero and not auto_switched_to_delivery:
-                                        # ══ גיבור משלוחים ══
-                                        # מציגים מחיר נטו (אחרי קיזוז תשלום נסיעה)
-                                        # ומציינים כמה הוא מקבל על הנסיעה בנפרד
-                                        p_price       = hero_net_p   # מחיר נטו ליחידה
-                                        gross_total   = round(hero_p * qty, 2)
-                                        net_total     = round(p_price * qty, 2)
-                                        trip_received = trip_pay      # תשלום נסיעה שמקבל
-                                        st.markdown(
-                                            f"• **{p['name']}**{carrier_badge} – "
-                                            f"{qty} יח' | {p_price}₪ ליחידה (נטו) | "
-                                            f"סה\"כ לתשלום: **{net_total}₪** "
-                                            f"*(כולל {trip_received}₪ תשלום נסיעה שמקבל)*"
-                                        )
-                                    else:
-                                        # ══ משתתף רגיל ══
-                                        p_price = active_price
-                                        p_total = round(p_price * qty, 2)
-                                        st.markdown(
-                                            f"• **{p['name']}**{carrier_badge} – "
-                                            f"{qty} יח' | {p_price}₪ ליחידה | "
-                                            f"סה\"כ לתשלום: **{p_total}₪**"
-                                        )
-                                else:
-                                    st.markdown(
-                                        f"• **{p['name']}**{carrier_badge} – "
-                                        f"{qty} יח' | ⏳ ממתין למחיר"
-                                    )
-
-                        # ── עדכון כמות / יציאה מעסקה למשתתפים קיימים ──
-                        # מוצג למשתמש מחובר שכבר נמצא ברשימה – גם כשהארגז מלא (closed)
-                        if deal_status["code"] in ("conditional", "closed") and deal["participants"]:
-                            cu_upd = st.session_state.get("current_user")
-                            # מחפשים את המשתמש המחובר ברשימת המשתתפים
-                            p_idx = None
-                            if cu_upd:
-                                p_idx = next(
-                                    (idx for idx, p in enumerate(deal["participants"])
-                                     if p.get("phone", "").strip() == cu_upd["phone"].strip()),
-                                    None
-                                )
-                            # מציגים כפתורים רק אם המשתמש אכן משתתף
-                            if cu_upd and p_idx is not None:
-                                upd_key   = f"upd_qty_{deal['id']}"
-                                leave_key = f"leave_deal_{deal['id']}"
-                                btn_upd_col, btn_leave_col = st.columns(2)
-                                with btn_upd_col:
-                                    if st.button(
-                                        "✏️ עדכן כמות",
-                                        key=f"upd_btn_{deal['id']}", type="secondary",
-                                        use_container_width=True
-                                    ):
-                                        st.session_state[upd_key] = True
-                                        st.session_state.pop(leave_key, None)
-                                with btn_leave_col:
-                                    if st.button(
-                                        "🚪 יציאה מעסקה",
-                                        key=f"leave_btn_{deal['id']}", type="secondary",
-                                        use_container_width=True
-                                    ):
-                                        st.session_state[leave_key] = True
-                                        st.session_state.pop(upd_key, None)
-
-                                # ── טופס עדכון כמות ──
-                                if st.session_state.get(upd_key):
-                                    current_qty = deal["participants"][p_idx]["quantity"]
-                                    with st.form(key=f"upd_form_{deal['id']}"):
-                                        new_qty = st.number_input(
-                                            "כמות יחידות חדשה", min_value=1, max_value=50, value=current_qty,
-                                            key=f"uqt_{deal['id']}"
-                                        )
-                                        ua, ub = st.columns(2)
-                                        u_confirm = ua.form_submit_button("✅ עדכן", type="primary", use_container_width=True)
-                                        u_cancel  = ub.form_submit_button("❌ ביטול", use_container_width=True)
-                                        if u_confirm:
-                                            st.session_state.bulk_deals[i]["participants"][p_idx]["quantity"] = int(new_qty)
-                                            db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                            st.session_state.pop(upd_key, None)
-                                            st.rerun()
-                                        if u_cancel:
-                                            st.session_state.pop(upd_key, None)
-                                            st.rerun()
-
-                                # ── טופס יציאה מעסקה ──
-                                if st.session_state.get(leave_key):
-                                    p_name = deal["participants"][p_idx]["name"]
-                                    with st.form(key=f"leave_form_{deal['id']}"):
-                                        st.warning(f"האם אתה בטוח שברצונך לצאת מהעסקה, **{p_name}**?")
-                                        lf1, lf2 = st.columns(2)
-                                        do_leave = lf1.form_submit_button("✅ כן, צא מהעסקה", type="primary", use_container_width=True)
-                                        no_leave = lf2.form_submit_button("❌ ביטול", use_container_width=True)
-                                        if do_leave:
-                                            # הסרת המשתתף מהרשימה
-                                            st.session_state.bulk_deals[i]["participants"].pop(p_idx)
-                                            # אם המשתתף היה גם המוביל – מבטלים גם את המוביל
-                                            cur_carrier = deal.get("carrier")
-                                            if cur_carrier and cur_carrier.get("phone", "").strip() == cu_upd["phone"].strip():
-                                                st.session_state.bulk_deals[i]["carrier"] = None
-                                            db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                            st.session_state.pop(leave_key, None)
-                                            st.success(f"👋 {p_name} יצא/ה מהעסקה.")
-                                            st.rerun()
-                                        if no_leave:
-                                            st.session_state.pop(leave_key, None)
-                                            st.rerun()
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 6: טופס הצטרפות – קנייה בלבד (נקי)
-                    # ══════════════════════════════════════════════════
-                    # שומרים על עסקה פתוחה רק כשהיא "מותנית" או "ריקה"
-                    # (לא כשסגורה להזמנה, ולא כשבוטלה)
-                    if deal_status["code"] in ("conditional", "empty"):
-                        # בדיקה: האם המשתמש המחובר כבר בעסקה?
-                        cu_join = st.session_state.get("current_user")
-                        already_in_deal = False
-                        if cu_join:
-                            existing_phones = [p.get("phone","").strip() for p in deal["participants"]]
-                            already_in_deal = cu_join["phone"].strip() in existing_phones
-
-                        if already_in_deal:
-                            # המשתמש כבר בעסקה – לא מציגים טופס הצטרפות
-                            st.info(f"✅ **{cu_join['name']}**, את/ה כבר בעסקה הזו. השתמש/י בכפתורי 'עדכן כמות' או 'יציאה מעסקה' למעלה.")
-                        else:
-                            st.markdown("**🙋 הצטרף לעסקה:**")
-                            if not require_login("להצטרף לעסקה"):
-                                pass  # require_login כבר הציג הודעה
-                            else:
-                                st.caption(f"👤 מצטרף כ: **{cu_join['name']}** | 📞 {cu_join['phone']}")
-                                with st.form(key=f"join_{deal['id']}"):
-                                    j_qty = st.number_input(
-                                        "כמות יחידות", min_value=1, max_value=50, value=1,
-                                        key=f"jq_{deal['id']}"
-                                    )
-                                    submitted = st.form_submit_button("הצטרף לעסקה 🚀", use_container_width=True)
-                                    if submitted:
-                                        # need_expiry = תאריך יעד העסקה (אוטומטי, לא ידני)
-                                        auto_expiry = deal.get("target_date", (date.today() + timedelta(days=14)).isoformat())
-                                        existing = st.session_state.bulk_deals[i].setdefault("participants", []) or []
-                                        existing.append({
-                                            "id":          gen_id(),
-                                            "name":        cu_join["name"],
-                                            "phone":       cu_join["phone"],
-                                            "quantity":    int(j_qty),
-                                            "need_expiry": auto_expiry,
-                                        })
-                                        st.session_state.bulk_deals[i]["participants"] = existing
-                                        db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                        st.success(f"✅ {cu_join['name']} הצטרף לעסקה!")
-                                        st.rerun()
-                    elif deal_status["code"] == "closed":
-                        # הודעה למשתתף – מה עליו לעשות עכשיו
-                        org_name  = deal.get("organizer_name", "המארגן")
-                        org_phone = deal.get("organizer_phone", "")
-                        wa_pay = whatsapp_link(
-                            org_phone,
-                            f"היי {org_name}! אני מוכן/ה לשלם על ההזמנה של '{deal['name']}' 💰"
-                        ) if org_phone else ""
-                        pay_btn = f"&nbsp; <a class='wa-btn' href='{wa_pay}' target='_blank'>💬 שלח ל-{org_name}</a>" if wa_pay else ""
-                        st.markdown(
-                            f"""
-                            <div style="background:#d4edda;border-radius:10px;padding:14px 18px;
-                                        direction:rtl;border:1px solid #28a745;margin-bottom:8px;">
-                                🎉 <strong>הארגז מלא!</strong> העסקה סגורה להצטרפויות חדשות.<br>
-                                💳 שלחו תשלום של <strong>{target_p}₪ ליחידה</strong>
-                                ל-<strong>{org_name}</strong> דרך Bit / Paybox.
-                                {pay_btn}
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    elif deal_status["code"] == "cancelled":
-                        st.error(
-                            "🔴 **העסקה בוטלה.** הדדליין עבר לפני שהארגז התמלא.  \n"
-                            "המארגן יכול להאריך את הדדליין ולהחיות את העסקה."
-                        )
-
-                    st.divider()
-
-                    # ══════════════════════════════════════════════════
-                    #  אזור 7: מערכת תגובות (שאלות ותשובות)
-                    # ══════════════════════════════════════════════════
-                    st.markdown("**💬 שאלות ותגובות:**")
-
-                    # הצגת תגובות קיימות
-                    comments = deal.get("comments", [])
-                    if not comments:
-                        st.caption("אין תגובות עדיין. שאל/י ראשון/ה!")
-                    else:
-                        for cmt in comments:
-                            ts = cmt.get("created_at", "")[:16].replace("T", " ")
-                            st.markdown(
-                                f"""
-                                <div style="background:#f8f9fa;border-radius:8px;padding:8px 12px;
-                                            margin-bottom:6px;direction:rtl;border-right:3px solid #dee2e6;">
-                                    <strong style="color:#333;">{cmt['author']}</strong>
-                                    <span style="color:#aaa;font-size:0.78em;margin-right:8px;">{ts}</span><br>
-                                    <span style="color:#555;">{cmt['text']}</span>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-
-                    # טופס הוספת תגובה – שם הכותב נמשך אוטומטית מה-current_user
-                    cu_cmt = st.session_state.get("current_user")
-                    if not require_login("להוסיף תגובה"):
-                        pass  # require_login הציג הודעה
-                    else:
-                        with st.form(key=f"cmt_form_{deal['id']}"):
-                            cmt_text = st.text_input("תגובה / שאלה *", key=f"cmt_t_{deal['id']}")
-                            if st.form_submit_button("שלח תגובה 💬", use_container_width=True):
-                                if cmt_text:
-                                    new_cmt = {
-                                        "id":         gen_id(),
-                                        "author":     cu_cmt["name"],
-                                        "text":       cmt_text.strip(),
-                                        "created_at": datetime.now().isoformat(),
-                                    }
-                                    existing_cmts = st.session_state.bulk_deals[i].get("comments") or []
-                                    existing_cmts.append(new_cmt)
-                                    st.session_state.bulk_deals[i]["comments"] = existing_cmts
-                                    db.update_bulk_deal(st.session_state.bulk_deals[i])
-                                    st.rerun()
-                                else:
-                                    st.error("נא למלא תגובה.")
-
-                # ── מרווח בין כרטיסי עסקאות ──
-                st.markdown('<div style="margin-bottom:24px;"></div>', unsafe_allow_html=True)
 
     # ── טאב: הצעת עסקה חדשה ──────────────────────────────────
     with tab_new:
@@ -2892,6 +2989,27 @@ def _show_share_detail(item_id: str, cu: dict | None):
                 </div>""",
                 unsafe_allow_html=True,
             )
+        # ── מחיקה — בעל הפריט בלבד ─────────────────────────────
+        if cu["phone"].strip() == item.get("phone", "").strip():
+            st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+            st.divider()
+            if st.session_state.get(f"_confirm_del_share_{item['id']}"):
+                st.warning("⚠️ למחוק את הפריט לצמיתות?")
+                c1, c2 = st.columns(2)
+                if c1.button("🗑️ כן, מחק", key=f"del_share_yes_{item['id']}", type="primary", use_container_width=True):
+                    db.delete_share_item(item["id"])
+                    db.invalidate_cache()
+                    st.session_state.share_items = db.get_share_items()
+                    st.session_state.pop("_detail_view", None)
+                    st.session_state.pop(f"_confirm_del_share_{item['id']}", None)
+                    st.rerun()
+                if c2.button("ביטול", key=f"del_share_no_{item['id']}", use_container_width=True):
+                    st.session_state.pop(f"_confirm_del_share_{item['id']}", None)
+                    st.rerun()
+            else:
+                if st.button("🗑️ מחק פרסום זה", key=f"del_share_{item['id']}", use_container_width=True):
+                    st.session_state[f"_confirm_del_share_{item['id']}"] = True
+                    st.rerun()
     else:
         st.info("🔒 התחבר/י כדי לראות פרטי קשר.")
 
@@ -2937,6 +3055,27 @@ def _show_gig_detail(job_id: str, cu: dict | None):
                 </div>""",
                 unsafe_allow_html=True,
             )
+        # ── מחיקה — המפרסם בלבד ──────────────────────────────────
+        if cu["phone"].strip() == job.get("phone", "").strip():
+            st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+            st.divider()
+            if st.session_state.get(f"_confirm_del_gig_{job['id']}"):
+                st.warning("⚠️ למחוק את משרה זו לצמיתות?")
+                c1, c2 = st.columns(2)
+                if c1.button("🗑️ כן, מחק", key=f"del_gig_yes_{job['id']}", type="primary", use_container_width=True):
+                    db.delete_gig_job(job["id"])
+                    db.invalidate_cache()
+                    st.session_state.gig_jobs = db.get_gig_jobs()
+                    st.session_state.pop("_detail_view", None)
+                    st.session_state.pop(f"_confirm_del_gig_{job['id']}", None)
+                    st.rerun()
+                if c2.button("ביטול", key=f"del_gig_no_{job['id']}", use_container_width=True):
+                    st.session_state.pop(f"_confirm_del_gig_{job['id']}", None)
+                    st.rerun()
+            else:
+                if st.button("🗑️ מחק פרסום זה", key=f"del_gig_{job['id']}", use_container_width=True):
+                    st.session_state[f"_confirm_del_gig_{job['id']}"] = True
+                    st.rerun()
     else:
         st.info("🔒 התחבר/י כדי לראות פרטי קשר.")
 
@@ -3020,6 +3159,27 @@ def _show_activity_detail(activity_id: str, cu: dict | None):
                     db.invalidate_cache()
                     st.success("👍 הצטרפת!")
                     st.session_state.activities = db.get_activities()
+                    st.rerun()
+        # ── מחיקה — המארגן בלבד ──────────────────────────────────
+        if cu["phone"].strip() == act.get("phone", "").strip():
+            st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+            st.divider()
+            if st.session_state.get(f"_confirm_del_act_{act['id']}"):
+                st.warning("⚠️ למחוק את הפעילות לצמיתות?")
+                c1, c2 = st.columns(2)
+                if c1.button("🗑️ כן, מחק", key=f"del_act_yes_{act['id']}", type="primary", use_container_width=True):
+                    db.delete_activity(act["id"])
+                    db.invalidate_cache()
+                    st.session_state.activities = db.get_activities()
+                    st.session_state.pop("_detail_view", None)
+                    st.session_state.pop(f"_confirm_del_act_{act['id']}", None)
+                    st.rerun()
+                if c2.button("ביטול", key=f"del_act_no_{act['id']}", use_container_width=True):
+                    st.session_state.pop(f"_confirm_del_act_{act['id']}", None)
+                    st.rerun()
+            else:
+                if st.button("🗑️ מחק פרסום זה", key=f"del_act_{act['id']}", use_container_width=True):
+                    st.session_state[f"_confirm_del_act_{act['id']}"] = True
                     st.rerun()
     else:
         st.info("🔒 התחבר/י כדי להשתתף.")
@@ -3602,6 +3762,7 @@ def show_landing():
 # ═══════════════════════════════════════════════════════════════════
 
 def main():
+    _restore_session()  # שחזור session לפני init_state
     init_state()
 
     import auth as auth_mod
@@ -3613,7 +3774,10 @@ def main():
     if qp_early.get("state") == "kfar_google" and "code" in qp_early:
         code         = qp_early["code"]
         redirect_uri = st.secrets.get("app", {}).get("url", "http://localhost:8501")
+        _s_bak = st.query_params.get("s", "")
         st.query_params.clear()
+        if _s_bak:
+            st.query_params["s"] = _s_bak
         result = auth_mod.handle_google_code(code, redirect_uri)
         if result["ok"]:
             profile = auth_mod.load_profile(result["email"])
@@ -3644,7 +3808,10 @@ def main():
         elif fid:
             # ברירת מחדל — אם אין focus_key, משתמשים ב-_activity_focus
             st.session_state["_activity_focus"] = fid
+        _s_bak2 = st.query_params.get("s", "")
         st.query_params.clear()
+        if _s_bak2:
+            st.query_params["s"] = _s_bak2
         st.rerun()
 
     # ── אם המשתמש לא מחובר – דף נחיתה מלא (ללא sidebar) ──
@@ -3652,6 +3819,8 @@ def main():
     if not cu:
         show_landing()
         return
+
+    _save_session(cu)  # שמירה ב-URL בכל render — שרידה לאחר F5
 
     # ── Sidebar (מוצג רק למשתמש מחובר) ──────────────────────────
     with st.sidebar:
