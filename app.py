@@ -2038,6 +2038,44 @@ def show_bulk_buy():
     # ── טאב: הצעת עסקה חדשה ──────────────────────────────────
     with tab_new:
         st.markdown("### פרסם עסקת קבוצה חדשה")
+
+        # ── כפתור וואטסאפ לבעל עסק ──────────────────────────────────
+        # URL Encoding מלא לעברית + ירידות שורה (%0A)
+        # כך שהטקסט יופיע בוואטסאפ כרשימה מסודרת
+        _WA_DEAL_URL = (
+            "https://wa.me/?text="
+            "%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A7%D7%91%D7%9C"
+            "%20%D7%A4%D7%A8%D7%98%D7%99%20%D7%A2%D7%A1%D7%A7%D7%94%20%D7%A2%D7%91%D7%95%D7%A8"
+            "%20%D7%A7%D7%91%D7%95%D7%A6%D7%AA%20%D7%94%D7%A8%D7%9B%D7%99%D7%A9%D7%94%3A%0A"
+            "%D7%A9%D7%9D%20%D7%A2%D7%A1%D7%A7%3A%0A"
+            "%D7%9B%D7%AA%D7%95%D7%91%D7%AA%3A%0A"
+            "%D7%A9%D7%A2%D7%95%D7%AA%20%D7%A4%D7%AA%D7%99%D7%97%D7%94%3A%0A"
+            "%D7%94%D7%90%D7%9D%20%D7%99%D7%A9%20%D7%9E%D7%A9%D7%9C%D7%95%D7%97"
+            "%20%28%D7%9B%D7%9F%2F%D7%9C%D7%90%29%3A%0A"
+            "%D7%9E%D7%97%D7%99%D7%A8%20%D7%9E%D7%A9%D7%9C%D7%95%D7%97%3A%0A"
+            "%D7%96%D7%9E%D7%9F%20%D7%94%D7%92%D7%A2%D7%AA%20%D7%9E%D7%A9%D7%9C%D7%95%D7%97"
+            "%20%D7%9E%D7%A9%D7%95%D7%A2%D7%A8%3A%0A"
+            "%D7%9E%D7%95%D7%A6%D7%A8%3A%0A"
+            "%D7%9E%D7%97%D7%99%D7%A8%20%D7%99%D7%97%D7%99%D7%93%D7%94%20%D7%91%D7%A2%D7%A1%D7%A7%D7%94%3A%0A"
+            "%D7%9B%D7%9E%D7%95%D7%AA%20%D7%99%D7%97%D7%99%D7%93%D7%95%D7%AA%3A%0A"
+            "%D7%94%D7%A2%D7%A8%D7%95%D7%AA%3A"
+        )
+        st.markdown(
+            "<div style='background:linear-gradient(135deg,#ecfdf5,#d1fae5);"
+            "border-radius:16px;padding:14px 18px;direction:rtl;margin-bottom:16px;"
+            "border:1px solid #10b981;'>"
+            "<div style='font-size:0.85em;color:#065f46;font-weight:600;margin-bottom:6px;'>"
+            "💡 טיפ: לפני מילוי הטופס — שלח לבעל העסק הודעת וואטסאפ מוכנה לקבל את כל הפרטים</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.link_button(
+            "💬 שלח הודעה לבעל עסק בוואטסאפ",
+            _WA_DEAL_URL,
+            use_container_width=True,
+        )
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
         # בלוק זה חסום למשתמשים שלא הזדהו
         cu_new_deal = st.session_state.get("current_user")
         if not require_login("לפרסם עסקה חדשה"):
