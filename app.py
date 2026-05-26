@@ -638,7 +638,8 @@ def remove_expired_participants(deal: dict) -> dict:
     before = len(deal["participants"])
     deal["participants"] = [
         p for p in deal["participants"]
-        if p["need_expiry"] >= today
+        # need_expiry חסר במשתתפים ישנים — ברירת מחדל: עתיד רחוק (לא מסירים)
+        if p.get("need_expiry", "9999-12-31") >= today
     ]
     removed = before - len(deal["participants"])
     return deal, removed
@@ -2678,9 +2679,18 @@ def _render_feed_card(
     clicked = st.button("לפרטים ←", key=btn_key, use_container_width=True)
 
     if clicked:
-        # זיהוי סוג הפריט לפי תחילית btn_key
+        # ── קבוצות רכישה: ניווט ישיר לדף המלא עם כל הפיצ'רים ──────────
+        # show_bulk_buy() כבר מכיל מחירים, ניהול מוביל, עריכה, ביטול וכו'.
+        # נשתמש ב-_bulk_focus כדי לפתוח את ה-deal הנכון אוטומטית.
+        if btn_key.startswith("feed_bulk_"):
+            if focus_id:
+                st.session_state["_bulk_focus"] = focus_id
+                st.session_state[f"show_detail_{focus_id}"] = True
+            st.session_state["_nav_override"] = "bulk_buy"
+            st.rerun()
+
+        # ── כל שאר הסוגים: דף פרטים ייחודי ────────────────────────────
         _TYPE_MAP = {
-            "feed_bulk_":  "bulk_deal",
             "feed_share_": "share_item",
             "feed_gig_":   "gig_job",
             "feed_act_":   "activity",
@@ -2693,7 +2703,6 @@ def _render_feed_card(
                 _itype = _it
                 break
 
-        # שמירת הפרטים ב-session_state — main() יזהה ויציג show_item_detail()
         st.session_state["_detail_view"] = {
             "type": _itype,
             "id":   focus_id or btn_key,
@@ -2809,9 +2818,23 @@ def _show_bulk_detail(deal_id: str, cu: dict | None):
             else:
                 st.markdown("#### 🛒 הצטרפות לעסקה")
                 qty = st.number_input("כמות יחידות", min_value=1, max_value=50, value=1, key="detail_bulk_qty")
+                # תאריך צורך — ברירת מחדל: תאריך יעד העסקה + 7 ימים
+                _default_expiry = (
+                    date.fromisoformat(deal["target_date"]) + timedelta(days=7)
+                    if deal.get("target_date") and deal["target_date"] != "—"
+                    else date.today() + timedelta(days=30)
+                )
+                need_exp = st.date_input(
+                    "עד מתי אתה צריך את המוצר?",
+                    value=_default_expiry,
+                    min_value=date.today(),
+                    key="detail_bulk_expiry",
+                    help="אם התאריך יעבור לפני שהעסקה מתבצעת — תוסר אוטומטית מהרשימה",
+                )
                 if st.button("הצטרף לעסקה!", key="detail_bulk_join", type="primary", use_container_width=True):
                     deal.setdefault("participants", []).append({
                         "name": cu["name"], "phone": cu["phone"], "quantity": qty,
+                        "need_expiry": need_exp.isoformat(),
                         "joined_at": datetime.now().isoformat(timespec="seconds"),
                     })
                     db._update_by_id("bulk_deals", deal, id_field="id")
@@ -3244,6 +3267,7 @@ def show_home():
             "meta": f"👤 {s.get('owner_name','')}",
             "btn_key": f"feed_share_{s['id']}",
             "target_page": "share_board",
+            "focus_id": s["id"],
         })
 
     # עבודות מזדמנות פתוחות בלבד
@@ -3263,6 +3287,7 @@ def show_home():
             "meta": f"💰 {wage}₪ {wage_type} &nbsp; 👤 {j.get('poster_name','')}",
             "btn_key": f"feed_gig_{j['id']}",
             "target_page": "gig_jobs",
+            "focus_id": j["id"],
         })
 
     # ── פילטור לפי הבחירה ─────────────────────────────────────────────
