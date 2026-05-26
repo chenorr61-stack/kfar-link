@@ -67,7 +67,7 @@ st.set_page_config(
 # ─────────────────────────────────────────────────
 st.markdown("""
 <link rel="manifest" href="/app/static/manifest.json">
-<link rel="apple-touch-icon" href="/app/static/icon-192.png">
+<link rel="apple-touch-icon" href="/app/static/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2119,16 +2119,25 @@ def show_bulk_buy():
             st.caption(f"📋 מארגן: **{cu_new_deal['name']}** | 📞 {cu_new_deal['phone']}")
 
             # ── קריאת פרה-פיל מעסקה דומה (אם קיים) ──────────────────
+            # חשוב: כאשר מגיע פרה-פיל, שומרים אותו ב-_stored_prefill ומגדילים counter.
+            # שינוי ה-counter משנה את מפתח הטופס → Streamlit מתייחס לכל widget כחדש
+            # → value= נלקח בחשבון ולא מוחלף ע"י ערך קאשד ישן.
             _prefill = st.session_state.pop("_prefill_deal", None)
             if _prefill:
                 st.session_state.pop("_open_similar_banner", None)
-                st.info(
-                    f"📋 הטופס מולא מעסקה דומה: **{_prefill.get('name','')}** "
-                    f"(ספק: {_prefill.get('supplier','')}). ערוך לפי הצורך ושלח."
-                )
-            _pf = _prefill or {}
+                st.session_state["_new_deal_pf_counter"] = st.session_state.get("_new_deal_pf_counter", 0) + 1
+                st.session_state["_stored_prefill"] = _prefill
+            
+            _pf = st.session_state.get("_stored_prefill") or {}
 
-            with st.form("new_deal_form"):
+            if _pf:
+                st.info(
+                    f"📋 הטופס מולא מעסקה דומה: **{_pf.get('name','')}** "
+                    f"(ספק: {_pf.get('supplier','')}). ערוך לפי הצורך ושלח."
+                )
+
+            _form_key = f"new_deal_form_{st.session_state.get('_new_deal_pf_counter', 0)}"
+            with st.form(_form_key):
                 # ── פרטי המוצר ──
                 st.markdown("**📦 פרטי המוצר:**")
                 nc1, nc2, nc_emoji = st.columns([2, 2, 1])
@@ -2232,6 +2241,11 @@ def show_bulk_buy():
                             }],
                         }
                         db.add_bulk_deal(new_deal)
+                        # ניקוי קאש + טעינה מחדש כדי שהעסקה תופיע מיד בכרטיסיית הרכישות
+                        db.invalidate_cache()
+                        st.session_state.bulk_deals = db.get_bulk_deals()
+                        st.session_state.pop("_stored_prefill", None)  # נקה פרה-פיל לאחר שימוש
+                        st.session_state["bulk_active_tab"] = 0  # חזור לטאב "עסקאות פעילות"
                         st.success(f"🎉 עסקת '{d_name}' פורסמה! שתף את השכנים.")
                         st.rerun()
 
