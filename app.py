@@ -2113,14 +2113,14 @@ def show_bulk_buy():
                 # ── פרטי המוצר ──
                 st.markdown("**📦 פרטי המוצר:**")
                 nc1, nc2, nc_emoji = st.columns([2, 2, 1])
-                d_name     = nc1.text_input("שם המוצר *", placeholder="שמן זית, נייר A4...")
-                d_supplier = nc2.text_input("שם העסק / ספק *", placeholder="מכולת שמואל...")
-                d_emoji    = nc_emoji.text_input("אימוג'י מוצר", value="📦", help="בחר אימוג'י שמייצג את המוצר")
+                d_name     = nc1.text_input("שם המוצר *", placeholder="שמן זית, נייר A4...", value=_pf.get("name", ""))
+                d_supplier = nc2.text_input("שם העסק / ספק *", placeholder="מכולת שמואל...", value=_pf.get("supplier", ""))
+                d_emoji    = nc_emoji.text_input("אימוג'י מוצר", value=_pf.get("product_emoji", "📦"), help="בחר אימוג'י שמייצג את המוצר")
 
                 nc3, nc4, nc5 = st.columns(3)
-                d_retail    = nc3.number_input("מחיר קמעונאי (₪/יחידה)", min_value=1.0, value=30.0, step=0.5)
-                d_box_price = nc4.number_input("מחיר ארגז מהספק (₪)",    min_value=1.0, value=100.0, step=5.0)
-                d_box_size  = nc5.number_input("יחידות בארגז",            min_value=1,   value=6,    step=1)
+                d_retail    = nc3.number_input("מחיר קמעונאי (₪/יחידה)", min_value=1.0, value=float(_pf.get("price_retail", 30.0)), step=0.5)
+                d_box_price = nc4.number_input("מחיר ארגז מהספק (₪)",    min_value=1.0, value=float(_pf.get("price_per_box", 100.0)), step=5.0)
+                d_box_size  = nc5.number_input("יחידות בארגז",            min_value=1,   value=int(_pf.get("box_size", 6)),    step=1)
 
                 st.caption(
                     f"💡 מחיר ספק ליחידה: **{d_box_price / d_box_size:.2f}₪** "
@@ -2133,10 +2133,10 @@ def show_bulk_buy():
                 # ── פרטי העסק – למתנדב שמגיע לאסוף ──
                 st.markdown("**🏪 פרטי העסק (למתנדב שמגיע לאסוף):**")
                 ba1, ba2 = st.columns(2)
-                d_biz_addr  = ba1.text_input("כתובת העסק", placeholder="רחוב הרצל 5, תל אביב")
-                d_biz_hours = ba2.text_input("שעות פתיחה", placeholder="א'–ו' 08:00–20:00")
+                d_biz_addr  = ba1.text_input("כתובת העסק", placeholder="רחוב הרצל 5, תל אביב", value=_pf.get("business_address", ""))
+                d_biz_hours = ba2.text_input("שעות פתיחה", placeholder="א'–ו' 08:00–20:00", value=_pf.get("business_hours", ""))
 
-                d_biz_phone = st.text_input("טלפון העסק", placeholder="03-1234567")
+                d_biz_phone = st.text_input("טלפון העסק", placeholder="03-1234567", value=_pf.get("business_phone", ""))
 
                 # ── Checkbox: אין משלוח חיצוני ──
                 # אם מסומן, שדה עלות המשלוח נעלם, ותרחיש A לא יוצג.
@@ -2252,33 +2252,39 @@ def show_bulk_buy():
                 _pd_emoji     = _pd.get("product_emoji", "📦")
                 _pd_status_cl = {"open":"🟢","closed":"🎉","cancelled":"🔴","done":"✅"}.get(_pd.get("status",""), "⚪")
 
-                # כרטיס עסקת עבר
+                # כרטיס עסקת עבר – עם כל פרטי העסקה
+                _pd_unit_price = round(_pd.get("price_per_box", 0) / max(1, _pd.get("box_size", 1)), 2)
                 st.markdown(
-                    f'<div style="background:#f9fafb;border-radius:20px;padding:20px 20px 14px 20px;'
-                    f'direction:rtl;border:1px solid #e5e7eb;margin-bottom:8px;">'
-                    f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
-                    f'<div style="font-size:1.8em;">{_pd_emoji}</div>'
-                    f'<div>'
-                    f'<div style="font-size:1.05em;font-weight:800;color:#111;">{_pd["name"]}</div>'
-                    f'<div style="font-size:0.78em;color:#6b7280;">ספק: {_pd.get("supplier","—")} · מארגן: {_pd.get("organizer_name","—")}</div>'
-                    f'</div></div>'
-                    f'<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.8em;color:#374151;">'
-                    f'<span>📅 {_pd.get("target_date","—")}</span>'
-                    f'<span>👥 {_pd_n_parts} משתתפים</span>'
-                    f'<span>📦 {_pd_total_u} יחידות</span>'
-                    f'<span>💰 {_pd_target_p}₪ ליחידה</span>'
-                    f'<span>{_pd_status_cl} {_pd.get("status","")}</span>'
+                    f'<div style="background:#f9fafb;border-radius:20px;padding:18px 20px 14px 20px;'
+                    f'direction:rtl;border:1px solid #e5e7eb;margin-bottom:10px;">'
+                    # שורת כותרת
+                    f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+                    f'<div style="font-size:2em;">{_pd_emoji}</div>'
+                    f'<div style="flex:1;">'
+                    f'<div style="font-size:1.1em;font-weight:800;color:#111;">{_pd["name"]}</div>'
+                    f'<div style="font-size:0.78em;color:#6b7280;margin-top:2px;">📅 הסתיים: {_pd.get("target_date","—")}</div>'
+                    f'</div>'
+                    f'<div style="font-size:0.75em;color:#fff;background:#6b7280;padding:3px 8px;border-radius:10px;">{_pd_status_cl} {_pd.get("status","")}</div>'
+                    f'</div>'
+                    # טבלת פרטים
+                    f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:0.82em;color:#374151;background:#fff;border-radius:12px;padding:12px;">'
+                    f'<div><span style="color:#6b7280;">🏪 ספק:</span> <strong>{_pd.get("supplier","—")}</strong></div>'
+                    f'<div><span style="color:#6b7280;">👤 מארגן:</span> <strong>{_pd.get("organizer_name","—")}</strong></div>'
+                    f'<div><span style="color:#6b7280;">📦 כמות יחידות:</span> <strong>{_pd_total_u}</strong></div>'
+                    f'<div><span style="color:#6b7280;">👥 משתתפים:</span> <strong>{_pd_n_parts}</strong></div>'
+                    f'<div><span style="color:#6b7280;">💰 מחיר ליחידה:</span> <strong>{_pd_unit_price}₪</strong></div>'
+                    f'<div><span style="color:#6b7280;">🏷️ מחיר קמעונאי:</span> <strong>{_pd.get("price_retail","—")}₪</strong></div>'
                     f'</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
-                # כפתור "פתח עסקה דומה"
-                _prefill_key = f"prefill_similar_{_pd['id']}"
+                # כפתור "פתח עסקה דומה" – ממלא טופס + עובר לטאב הוספה
                 if st.button(
                     "📋 פתח עסקה דומה",
                     key=f"similar_btn_{_pd['id']}",
                     use_container_width=True,
+                    type="primary",
                 ):
                     st.session_state["_prefill_deal"] = {
                         "name":         _pd.get("name", ""),
@@ -2294,14 +2300,22 @@ def show_bulk_buy():
                         "delivery_cost":    _pd.get("delivery_cost", 0),
                         "no_delivery":      _pd.get("no_delivery", False),
                     }
-                    st.session_state["_open_similar_banner"] = True
+                    st.session_state["_switch_to_new_deal_tab"] = True
                     st.rerun()
 
                 st.markdown('<div style="margin-bottom:4px;"></div>', unsafe_allow_html=True)
 
-            # באנר כשנטענה עסקה דומה
-            if st.session_state.get("_open_similar_banner"):
-                st.success("✅ פרטי העסקה הועברו לטופס! לחץ על הטאב '➕ הצע עסקה חדשה' להשלמה.")
+            # ── מעבר אוטומטי לטאב "הצע עסקה חדשה" לאחר לחיצה על עסקה דומה ──
+            if st.session_state.pop("_switch_to_new_deal_tab", False):
+                st.markdown(
+                    """<script>
+                    setTimeout(function() {
+                        var tabs = window.parent.document.querySelectorAll('[data-baseweb="tab"]');
+                        if (tabs.length >= 2) { tabs[1].click(); }
+                    }, 150);
+                    </script>""",
+                    unsafe_allow_html=True,
+                )
 
 
 def show_share_board():
