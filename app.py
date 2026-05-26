@@ -2040,8 +2040,6 @@ def show_bulk_buy():
         st.markdown("### פרסם עסקת קבוצה חדשה")
 
         # ── כפתור וואטסאפ לבעל עסק ──────────────────────────────────
-        # URL Encoding מלא לעברית + ירידות שורה (%0A)
-        # כך שהטקסט יופיע בוואטסאפ כרשימה מסודרת
         _WA_DEAL_URL = (
             "https://wa.me/?text="
             "%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A7%D7%91%D7%9C"
@@ -2065,17 +2063,16 @@ def show_bulk_buy():
             "border-radius:16px;padding:14px 18px;direction:rtl;margin-bottom:16px;"
             "border:1px solid #10b981;'>"
             "<div style='font-size:0.85em;color:#065f46;font-weight:600;margin-bottom:6px;'>"
-            "💡 טיפ: לפני מילוי הטופס — שלח לבעל העסק הודעת וואטסאפ מוכנה לקבל את כל הפרטים</div>"
+            "\U0001f4a1 טיפ: לפני מילוי הטופס — שלח לבעל העסק הודעת וואטסאפ מוכנה לקבל את כל הפרטים</div>"
             "</div>",
             unsafe_allow_html=True,
         )
         st.link_button(
-            "💬 שלח הודעה לבעל עסק בוואטסאפ",
+            "\U0001f4ac שלח הודעה לבעל עסק בוואטסאפ",
             _WA_DEAL_URL,
             use_container_width=True,
         )
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
         # בלוק זה חסום למשתמשים שלא הזדהו
         cu_new_deal = st.session_state.get("current_user")
         if not require_login("לפרסם עסקה חדשה"):
@@ -3869,7 +3866,8 @@ def main():
         st.success(f"👤 מחובר/ת כ: **{cu['name']}**")
         st.caption(f"📞 {cu['phone']}")
         if st.button("🚪 התנתק", use_container_width=True, key="logout_btn"):
-            auth_mod.logout()   # מנקה current_user + כל מצב auth
+            auth_mod.logout()        # מנקה current_user + כל מצב auth
+            st.query_params.clear()  # מנקה את ה-s param כדי ש-_restore_session לא ישחזר
             st.rerun()
 
         st.divider()
