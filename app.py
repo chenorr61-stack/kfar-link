@@ -459,108 +459,31 @@ st.markdown("""
     .chip-ride     { background:#CCFBF1 !important; color:#0D9488 !important; }
     .chip-help     { background:#f3e5f5 !important; color:#7c3aed !important; }
 
-    /* ═══════════════════════════════════════════════
-       כפתורי פיד — targeting ע"י st-key-{key}
-       ═══════════════════════════════════════════════
-       חשוב: Streamlit 1.36+ מוסיף class בשם `st-key-{key}` על
-       element container של הכפתור. אנחנו מסתמכים על זה, כי div
-       שהזרקנו ב-st.markdown הוא בתוך container נפרד ולכן selector
-       של adjacent-sibling לא עובד. מטרגטים גם את ה-stElementContainer
-       וגם דרך :has() לכיסוי מלא.                                                  */
-
     /* Google Fonts – Heebo (עברית מודרנית, ברורה, ידידותית) */
     @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap');
 
-    /* עיצוב משותף לכל כפתורי הפיד (לפי תחילית המפתח feed_) */
-    [class*="st-key-feed_"] button,
-    div:has(> div > button[data-testid="stBaseButton-secondary"])[class*="st-key-feed_"] button {
-        background: linear-gradient(135deg, #f4f6ff 0%, #e9edff 100%) !important;
-        border: none !important;
-        border-right: 6px solid #667eea !important;
-        border-radius: 22px !important;
-        padding: 10px 16px !important;
-        text-align: right !important;
-        direction: rtl !important;
-        white-space: normal !important;
+    /* כפתור "לפרטים" מתחת לכרטיס פיד — עיצוב עדין, מחובר לכרטיס.
+       הכרטיס עצמו מרונדר כ-HTML טהור עם inline styles, כך שהצבעים
+       מובטחים ללא תלות ב-CSS selectors של Streamlit. */
+    [class*="st-key-feed_"] button {
+        background: rgba(255,255,255,0.55) !important;
+        border: 1px solid rgba(0,0,0,0.09) !important;
+        border-radius: 0 0 14px 14px !important;
+        color: #374151 !important;
+        font-size: 0.82em !important;
+        font-weight: 700 !important;
+        padding: 5px 14px !important;
+        margin-top: -2px !important;
+        text-align: center !important;
         height: auto !important;
-        min-height: 64px !important;
-        box-shadow: 0 5px 16px rgba(0,0,0,0.08) !important;
-        transition: all 0.3s ease !important;
-        color: #1a2332 !important;
-        font-family: 'Heebo', 'Rubik', 'Assistant', 'Segoe UI', -apple-system, sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.95em !important;
-        line-height: 1.4 !important;
+        min-height: 0 !important;
+        box-shadow: none !important;
+        transition: background 0.2s ease !important;
     }
     [class*="st-key-feed_"] button:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 12px 28px rgba(0,0,0,0.15) !important;
-        filter: brightness(1.05) saturate(1.1) !important;
-    }
-    /* עיצוב פסקאות (summary, meta) ו-h3 (title) בתוך הכפתור */
-    [class*="st-key-feed_"] button p,
-    [class*="st-key-feed_"] button div p {
-        text-align: right !important;
-        direction: rtl !important;
-        margin: 1px 0 !important;
-        font-size: 0.95em !important;
-        font-weight: 600 !important;
-        line-height: 1.4 !important;
-    }
-    [class*="st-key-feed_"] button h3,
-    [class*="st-key-feed_"] button div h3 {
-        text-align: right !important;
-        direction: rtl !important;
-        font-size: 1.1em !important;
-        font-weight: 800 !important;
-        margin: 2px 0 3px 0 !important;
-        color: inherit !important;
-        letter-spacing: 0.3px !important;
-    }
-
-    /* ── צבעוניות ייחודית לכל סוג כרטיס ──
-       כל סוג מקבל גרדיאנט בצבע משלו + גבול ימני תואם. */
-
-    /* 🛒 רכישה קבוצתית – כתום/שמש */
-    [class*="st-key-feed_bulk_"] button {
-        background: linear-gradient(135deg, #fff1d6 0%, #ffdfa0 100%) !important;
-        border-right: 7px solid #ff9500 !important;
-        color: #5a3410 !important;
-    }
-
-    /* 📦 השאלת ציוד – ירוק מנטה */
-    [class*="st-key-feed_share_"] button {
-        background: linear-gradient(135deg, #d9f7e4 0%, #a8e8c3 100%) !important;
-        border-right: 7px solid #0D9488 !important;
-        color: #0e3d24 !important;
-    }
-
-    /* 💼 עבודה מזדמנת – ורוד פוקסיה */
-    [class*="st-key-feed_gig_"] button {
-        background: linear-gradient(135deg, #ffd9ec 0%, #ffacd0 100%) !important;
-        border-right: 7px solid #e84393 !important;
-        color: #4a0e2a !important;
-    }
-
-    /* 🎉 פעילות – תכלת/כחול שמיים */
-    [class*="st-key-feed_act_"] button {
-        background: linear-gradient(135deg, #cdebff 0%, #9ad2f7 100%) !important;
-        border-right: 7px solid #0984e3 !important;
-        color: #0a2a44 !important;
-    }
-
-    /* 🚗 טרמפ – סגול לבנדר */
-    [class*="st-key-feed_ride_"] button {
-        background: linear-gradient(135deg, #e2ddfd 0%, #bdb1f5 100%) !important;
-        border-right: 7px solid #6c5ce7 !important;
-        color: #1e1449 !important;
-    }
-
-    /* 🆘 בקשת עזרה – אפרסק/כתום חם */
-    [class*="st-key-feed_help_"] button {
-        background: linear-gradient(135deg, #ffd9c7 0%, #ffb39a 100%) !important;
-        border-right: 7px solid #e17055 !important;
-        color: #4a1c0a !important;
+        background: rgba(255,255,255,0.85) !important;
+        transform: none !important;
+        filter: none !important;
     }
 
     /* ── גם על קוביות .feed-btn-wrap הישנות (אם נשארו בשימוש) ── */
@@ -2583,27 +2506,124 @@ def _render_feed_card(
     focus_id: str | None = None,
 ):
     """
-    כרטיס פיד לחיץ לגמרי — כל הכרטיס הוא st.button אחד.
-    משתמשים ב-st.button (לא ב-<a href>) כדי לא לעשות page reload
-    שישכח את current_user.
+    כרטיס פיד עם צבע ייחודי לכל סוג.
+
+    הגישה: מרנדרים את הכרטיס הצבעוני כ-HTML טהור (inline styles — בלי תלות ב-CSS selectors
+    שמתנגשים עם Streamlit הפנימי), ואז מוסיפים st.button קטן לניווט מתחתיו.
+    כך כל כרטיס מקבל בדיוק את הצבע הנכון ללא תלות בגרסת Streamlit.
     """
-    # label של הכפתור = Markdown עם מספר שורות.
-    # שורה ריקה בין פסקאות יוצרת break בטוח ב-Streamlit button.
-    # הערה: הקיצרתי את ה-label – chip_label מופיע כטקסט קצר לצד האייקון,
-    # הכותרת ב-H3 קטן, ותיאור קצר אחרי. זה הופך את הכרטיס לקומפקטי יותר.
-    label = (
-        f"{icon} **{chip_label}**\n\n"
-        f"### {title}\n"
-        f"{summary}\n\n"
-        f"{meta}"
+
+    # ── פלטת צבעים לפי סוג כרטיס (לפי תחילית btn_key) ──────────────
+    _THEMES = {
+        "feed_bulk_":  {
+            "bg":         "linear-gradient(135deg,#fff8ec 0%,#ffe8b0 100%)",
+            "border":     "#f59e0b",
+            "chip_bg":    "#fef3c7",
+            "chip_color": "#92400e",
+            "title_color":"#78350f",
+        },
+        "feed_share_": {
+            "bg":         "linear-gradient(135deg,#ecfdf5 0%,#a7f3d0 100%)",
+            "border":     "#10b981",
+            "chip_bg":    "#d1fae5",
+            "chip_color": "#065f46",
+            "title_color":"#064e3b",
+        },
+        "feed_gig_":   {
+            "bg":         "linear-gradient(135deg,#fdf2f8 0%,#fbcfe8 100%)",
+            "border":     "#ec4899",
+            "chip_bg":    "#fce7f3",
+            "chip_color": "#9d174d",
+            "title_color":"#831843",
+        },
+        "feed_act_":   {
+            "bg":         "linear-gradient(135deg,#eff6ff 0%,#bfdbfe 100%)",
+            "border":     "#3b82f6",
+            "chip_bg":    "#dbeafe",
+            "chip_color": "#1e40af",
+            "title_color":"#1e3a5f",
+        },
+        "feed_ride_":  {
+            "bg":         "linear-gradient(135deg,#f5f3ff 0%,#ddd6fe 100%)",
+            "border":     "#8b5cf6",
+            "chip_bg":    "#ede9fe",
+            "chip_color": "#5b21b6",
+            "title_color":"#4c1d95",
+        },
+        "feed_help_":  {
+            "bg":         "linear-gradient(135deg,#fff7ed 0%,#fed7aa 100%)",
+            "border":     "#f97316",
+            "chip_bg":    "#ffedd5",
+            "chip_color": "#c2410c",
+            "title_color":"#7c2d12",
+        },
+    }
+
+    # בחירת ערכת הצבעים לפי תחילית המפתח
+    theme = {
+        "bg":         "linear-gradient(135deg,#f8faff 0%,#e0e7ff 100%)",
+        "border":     "#6366f1",
+        "chip_bg":    "#e0e7ff",
+        "chip_color": "#4338ca",
+        "title_color":"#1e1b4b",
+    }
+    for prefix, t in _THEMES.items():
+        if btn_key.startswith(prefix):
+            theme = t
+            break
+
+    # ── רינדור הכרטיס כ-HTML עם inline styles (אין תלות ב-CSS חיצוני) ──
+    st.markdown(
+        f"""
+        <div style="
+            background:{theme['bg']};
+            border-right:7px solid {theme['border']};
+            border-radius:18px 18px 0 0;
+            padding:16px 20px 12px 16px;
+            margin:8px 0 0 0;
+            direction:rtl;
+            box-shadow:0 4px 18px rgba(0,0,0,0.08);
+            font-family:'Heebo','Rubik','Assistant','Segoe UI',sans-serif;
+        ">
+            <div style="
+                display:inline-block;
+                background:{theme['chip_bg']};
+                color:{theme['chip_color']};
+                font-size:0.72em;
+                font-weight:800;
+                border-radius:20px;
+                padding:3px 10px;
+                margin-bottom:10px;
+                letter-spacing:0.4px;
+            ">{icon} {chip_label}</div>
+            <div style="
+                font-size:1.05em;
+                font-weight:800;
+                color:{theme['title_color']};
+                margin-bottom:6px;
+                line-height:1.35;
+            ">{title}</div>
+            <div style="
+                font-size:0.88em;
+                color:#374151;
+                margin-bottom:8px;
+                line-height:1.5;
+            ">{summary}</div>
+            <div style="
+                font-size:0.78em;
+                color:#6b7280;
+                line-height:1.4;
+            ">{meta}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # אין יותר wrapper-div: ה-CSS מטרגט את הכפתור ישירות דרך class `st-key-{btn_key}`
-    # שנוצר אוטומטית ע"י Streamlit (1.36+) על ה-element container של הכפתור.
-    clicked = st.button(label, key=btn_key, use_container_width=True)
+    # ── כפתור ניווט מתחת לכרטיס ─────────────────────────────────────
+    clicked = st.button("לפרטים ←", key=btn_key, use_container_width=True)
 
     if clicked:
-        # ניווט שקוף — רק עדכון session_state, בלי URL change
+        # ניווט שקוף — רק עדכון session_state, בלי page reload
         st.session_state["_nav_override"] = target_page
         if focus_id:
             if focus_key:
