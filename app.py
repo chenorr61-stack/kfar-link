@@ -16,8 +16,40 @@ import streamlit as st
 from datetime import datetime, date, timedelta
 import uuid
 import math
+import base64 as _b64
+import json as _json
 
 import db  # שכבת הגישה ל-Google Sheets (users, bulk_deals, share_items, gig_jobs, activities)
+
+
+# ─────────────────────────────────────────────────
+#  Session Persistence — שמירה/שחזור ב-URL param
+# ─────────────────────────────────────────────────
+# Streamlit Cloud יוצר session חדש בכל F5.
+# הפתרון: שומרים פרטי משתמש מינימליים ב-query param "s" (base64).
+# זה גלוי ב-URL אבל אין בו מידע רגיש (רק שם, טלפון, מייל, uid).
+
+def _save_session(user: dict) -> None:
+    """שומר את המשתמש ב-URL query param כדי לשרוד refresh."""
+    try:
+        enc = _b64.urlsafe_b64encode(_json.dumps(user).encode()).decode()
+        st.query_params["s"] = enc
+    except Exception:
+        pass
+
+
+def _restore_session() -> None:
+    """משחזר session מה-URL query param אם session_state ריק."""
+    if st.session_state.get("current_user"):
+        return
+    try:
+        enc = st.query_params.get("s", "")
+        if enc:
+            data = _json.loads(_b64.urlsafe_b64decode(enc.encode() + b"==").decode())
+            if data.get("name") and data.get("phone"):
+                st.session_state.current_user = data
+    except Exception:
+        pass
 
 # ─────────────────────────────────────────────────
 #  הגדרות דף
@@ -2642,18 +2674,365 @@ def _render_feed_card(
         unsafe_allow_html=True,
     )
 
-    # ── כפתור ניווט מתחת לכרטיס ─────────────────────────────────────
+    # ── כפתור ניווט — פותח דף פרטים ייחודי ─────────────────────────
     clicked = st.button("לפרטים ←", key=btn_key, use_container_width=True)
 
     if clicked:
-        # ניווט שקוף — רק עדכון session_state, בלי page reload
-        st.session_state["_nav_override"] = target_page
-        if focus_id:
-            if focus_key:
-                st.session_state[focus_key] = focus_id
-            else:
-                st.session_state["_activity_focus"] = focus_id
+        # זיהוי סוג הפריט לפי תחילית btn_key
+        _TYPE_MAP = {
+            "feed_bulk_":  "bulk_deal",
+            "feed_share_": "share_item",
+            "feed_gig_":   "gig_job",
+            "feed_act_":   "activity",
+            "feed_ride_":  "ride",
+            "feed_help_":  "help_request",
+        }
+        _itype = "unknown"
+        for _pfx, _it in _TYPE_MAP.items():
+            if btn_key.startswith(_pfx):
+                _itype = _it
+                break
+
+        # שמירת הפרטים ב-session_state — main() יזהה ויציג show_item_detail()
+        st.session_state["_detail_view"] = {
+            "type": _itype,
+            "id":   focus_id or btn_key,
+        }
         st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  דף פרטים — נפתח בלחיצה על כרטיס בפיד
+# ═══════════════════════════════════════════════════════════════════
+
+def _detail_back_btn():
+    """כפתור חזרה לפיד — מנקה _detail_view ומרנדר מחדש."""
+    if st.button("← חזור לדף הראשי", key="back_from_detail"):
+        st.session_state.pop("_detail_view", None)
+        st.rerun()
+        return True
+    return False
+
+
+def _detail_card_header(icon: str, chip_label: str, title: str,
+                         bg: str, border: str, chip_bg: str,
+                         chip_color: str, title_color: str):
+    """כותרת הכרטיס — אותו סגנון כמו הפיד, רק גדול יותר."""
+    st.markdown(
+        f"""
+        <div style="
+            background:{bg};
+            border-right:8px solid {border};
+            border-radius:18px;
+            padding:20px 24px 16px;
+            margin-bottom:0;
+            direction:rtl;
+            font-family:'Heebo','Rubik','Assistant','Segoe UI',sans-serif;
+            box-shadow:0 4px 20px rgba(0,0,0,0.08);
+        ">
+            <div style="
+                display:inline-block;
+                background:{chip_bg};color:{chip_color};
+                font-size:0.8em;font-weight:800;
+                border-radius:20px;padding:4px 12px;
+                margin-bottom:10px;
+            ">{icon} {chip_label}</div>
+            <div style="
+                font-size:1.45em;font-weight:800;
+                color:{title_color};line-height:1.3;
+            ">{title}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _detail_row(label: str, value: str):
+    """שורת מידע בטבלת הפרטים."""
+    st.markdown(
+        f"""
+        <div style="
+            display:flex;justify-content:space-between;
+            padding:10px 4px;border-bottom:1px solid #f1f5f9;
+            direction:rtl;font-family:'Heebo','Rubik',sans-serif;
+        ">
+            <span style="color:#6b7280;font-size:0.88em;">{label}</span>
+            <span style="font-weight:600;font-size:0.92em;color:#1f2937;">{value}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ── פרטי רכישה קבוצתית ─────────────────────────────────────────────
+def _show_bulk_detail(deal_id: str, cu: dict | None):
+    deal = next((d for d in st.session_state.bulk_deals if d["id"] == deal_id), None)
+    if not deal:
+        st.warning("העסקה לא נמצאה.")
+        return
+
+    emoji = deal.get("product_emoji", "🛒")
+    committed = sum(p.get("quantity", 0) for p in deal.get("participants", []))
+    status_map = {"open": "🟢 פתוחה", "closed": "🟡 סגורה להזמנה", "done": "✅ הושלמה", "cancelled": "❌ בוטלה"}
+
+    _detail_card_header(
+        icon=emoji, chip_label="רכישה קבוצתית", title=deal.get("name", "עסקה"),
+        bg="linear-gradient(135deg,#fff8ec,#ffe8b0)",
+        border="#f59e0b", chip_bg="#fef3c7", chip_color="#92400e", title_color="#78350f",
+    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    _detail_row("📦 ספק", deal.get("supplier", "—"))
+    _detail_row("📊 סטטוס", status_map.get(deal.get("status", ""), "—"))
+    _detail_row("📅 תאריך יעד", deal.get("target_date", "—"))
+    _detail_row("👥 משתתפים כרגע", str(len(deal.get("participants", []))))
+    _detail_row("📐 גודל ארגז", str(deal.get("box_size", "—")))
+    _detail_row("🔢 יחידות שנרשמו", str(committed))
+    if deal.get("description"):
+        st.markdown(
+            f"<div style='background:#fffbf0;border-radius:12px;padding:14px 16px;"
+            f"direction:rtl;font-size:0.9em;color:#374151;margin:10px 0;'>"
+            f"📝 {deal['description']}</div>",
+            unsafe_allow_html=True,
+        )
+    _detail_row("👤 מארגן", f"{deal.get('organizer_name','—')} · {deal.get('organizer_phone','')}")
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # פעולות
+    if deal.get("status") == "open":
+        if cu:
+            already = any(p.get("phone","").strip() == cu["phone"].strip()
+                          for p in deal.get("participants", []))
+            if already:
+                st.success("✅ אתה כבר חלק מהעסקה הזו!")
+            else:
+                st.markdown("#### 🛒 הצטרפות לעסקה")
+                qty = st.number_input("כמות יחידות", min_value=1, max_value=50, value=1, key="detail_bulk_qty")
+                if st.button("הצטרף לעסקה!", key="detail_bulk_join", type="primary", use_container_width=True):
+                    deal.setdefault("participants", []).append({
+                        "name": cu["name"], "phone": cu["phone"], "quantity": qty,
+                        "joined_at": datetime.now().isoformat(timespec="seconds"),
+                    })
+                    db._update_by_id("bulk_deals", deal, id_field="id")
+                    db.invalidate_cache()
+                    st.success(f"🎉 הצטרפת! הזמנת {qty} יחידות.")
+                    st.session_state.bulk_deals = db.get_bulk_deals()
+                    st.rerun()
+        else:
+            st.info("🔒 התחבר/י כדי להצטרף לעסקה.")
+    else:
+        st.info("העסקה אינה פתוחה כרגע להצטרפות.")
+
+
+# ── פרטי השאלת ציוד ────────────────────────────────────────────────
+def _show_share_detail(item_id: str, cu: dict | None):
+    item = next((s for s in st.session_state.share_items if s["id"] == item_id), None)
+    if not item:
+        st.warning("הפריט לא נמצא.")
+        return
+
+    is_offer = item.get("type") == "offer"
+    icon = "📦" if is_offer else "🔍"
+    chip_label = "מציע להשאיל" if is_offer else "מחפש להשאיל"
+
+    _detail_card_header(
+        icon=icon, chip_label=chip_label, title=item.get("item_name", "פריט"),
+        bg="linear-gradient(135deg,#ecfdf5,#a7f3d0)",
+        border="#10b981", chip_bg="#d1fae5", chip_color="#065f46", title_color="#064e3b",
+    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    _detail_row("👤 שם", item.get("owner_name", "—"))
+    if item.get("condition"):
+        _detail_row("⭐ מצב הפריט", item["condition"])
+    if item.get("description"):
+        st.markdown(
+            f"<div style='background:#f0fdf4;border-radius:12px;padding:14px 16px;"
+            f"direction:rtl;font-size:0.9em;color:#374151;margin:10px 0;'>"
+            f"📝 {item['description']}</div>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # פרטי קשר — מוצגים למשתמש מחובר בלבד
+    if cu:
+        phone = item.get("phone", "")
+        if phone:
+            st.markdown(
+                f"""<div style="
+                    background:#d1fae5;border-radius:14px;padding:16px 20px;
+                    direction:rtl;font-family:'Heebo','Rubik',sans-serif;text-align:center;
+                ">
+                    <div style="font-size:0.8em;color:#065f46;margin-bottom:4px;">📞 לתיאום — התקשר/י ל:</div>
+                    <div style="font-size:1.4em;font-weight:800;color:#064e3b;">{phone}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("🔒 התחבר/י כדי לראות פרטי קשר.")
+
+
+# ── פרטי עבודה מזדמנת ──────────────────────────────────────────────
+def _show_gig_detail(job_id: str, cu: dict | None):
+    job = next((j for j in st.session_state.gig_jobs if j["id"] == job_id), None)
+    if not job:
+        st.warning("העבודה לא נמצאה.")
+        return
+
+    wage_type = "לשעה" if job.get("wage_type") == "per_hour" else "עבור כל העבודה"
+
+    _detail_card_header(
+        icon="💼", chip_label="עבודה מזדמנת", title=job.get("title", "עבודה"),
+        bg="linear-gradient(135deg,#fdf2f8,#fbcfe8)",
+        border="#ec4899", chip_bg="#fce7f3", chip_color="#9d174d", title_color="#831843",
+    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    _detail_row("💰 שכר", f"{job.get('wage',0)}₪ {wage_type}")
+    _detail_row("📊 סטטוס", {"open":"🟢 פתוח","taken":"🟡 תפוס","done":"✅ הסתיים"}.get(job.get("status",""), "—"))
+    _detail_row("👤 מפרסם", job.get("poster_name", "—"))
+    if job.get("description"):
+        st.markdown(
+            f"<div style='background:#fdf2f8;border-radius:12px;padding:14px 16px;"
+            f"direction:rtl;font-size:0.9em;color:#374151;margin:10px 0;'>"
+            f"📝 {job['description']}</div>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    if cu:
+        phone = job.get("phone", "")
+        if phone:
+            st.markdown(
+                f"""<div style="
+                    background:#fce7f3;border-radius:14px;padding:16px 20px;
+                    direction:rtl;font-family:'Heebo','Rubik',sans-serif;text-align:center;
+                ">
+                    <div style="font-size:0.8em;color:#9d174d;margin-bottom:4px;">📞 פנה/י למפרסם:</div>
+                    <div style="font-size:1.4em;font-weight:800;color:#831843;">{phone}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("🔒 התחבר/י כדי לראות פרטי קשר.")
+
+
+# ── פרטי פעילות / טרמפ / בקשת עזרה ────────────────────────────────
+def _show_activity_detail(activity_id: str, cu: dict | None):
+    act = next((a for a in st.session_state.activities if a["id"] == activity_id), None)
+    if not act:
+        st.warning("הפעילות לא נמצאה.")
+        return
+
+    a_type = act.get("type", "activity")
+    _THEMES_ACT = {
+        "activity":     ("🎉", "פעילות",       "linear-gradient(135deg,#eff6ff,#bfdbfe)", "#3b82f6", "#dbeafe", "#1e40af", "#1e3a5f"),
+        "ride":         ("🚗", "טרמפ",          "linear-gradient(135deg,#f5f3ff,#ddd6fe)", "#8b5cf6", "#ede9fe", "#5b21b6", "#4c1d95"),
+        "help_request": ("🆘", "בקשת עזרה",    "linear-gradient(135deg,#fff7ed,#fed7aa)", "#f97316", "#ffedd5", "#c2410c", "#7c2d12"),
+    }
+    icon, chip_label, bg, border, chip_bg, chip_color, title_color = _THEMES_ACT.get(a_type, _THEMES_ACT["activity"])
+
+    _detail_card_header(
+        icon=icon, chip_label=chip_label, title=act.get("title", "פעילות"),
+        bg=bg, border=border, chip_bg=chip_bg, chip_color=chip_color, title_color=title_color,
+    )
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    _detail_row("📅 תאריך", act.get("event_date", "—"))
+    _detail_row("⏰ שעה",   act.get("event_time", "—"))
+    if act.get("location"):
+        _detail_row("📍 מיקום", act["location"])
+    _detail_row("👤 מארגן", f"{act.get('organizer_name','—')} · {act.get('phone','')}")
+    n_participants = len(act.get("participants", []))
+    n_volunteers   = len(act.get("volunteers",   []))
+    if n_participants:
+        _detail_row("🙋 משתתפים", str(n_participants))
+    if n_volunteers:
+        _detail_row("💪 מתנדבים", str(n_volunteers))
+    if act.get("description"):
+        st.markdown(
+            f"<div style='background:#f8faff;border-radius:12px;padding:14px 16px;"
+            f"direction:rtl;font-size:0.9em;color:#374151;margin:10px 0;'>"
+            f"📝 {act['description']}</div>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # פעולות לפי סוג
+    if cu:
+        my_phone = cu["phone"].strip()
+        if a_type == "activity":
+            already = any(p.get("phone","").strip() == my_phone for p in act.get("participants", []))
+            if already:
+                st.success("✅ כבר נרשמת לפעילות זו!")
+            elif act.get("event_date", "") >= date.today().isoformat():
+                if st.button("🙋 אני מגיע/ה!", key="detail_join_act", type="primary", use_container_width=True):
+                    act.setdefault("participants", []).append({"name": cu["name"], "phone": my_phone})
+                    db._update_by_id("activities", act, id_field="id")
+                    db.invalidate_cache()
+                    st.success("🎉 נרשמת!")
+                    st.session_state.activities = db.get_activities()
+                    st.rerun()
+        elif a_type == "help_request":
+            already_vol = any(v.get("phone","").strip() == my_phone for v in act.get("volunteers", []))
+            if already_vol:
+                st.success("✅ כבר נרשמת כמתנדב/ת!")
+            elif act.get("event_date", "") >= date.today().isoformat():
+                if st.button("💪 אני מתנדב/ת!", key="detail_join_help", type="primary", use_container_width=True):
+                    act.setdefault("volunteers", []).append({"name": cu["name"], "phone": my_phone})
+                    db._update_by_id("activities", act, id_field="id")
+                    db.invalidate_cache()
+                    st.success("🙏 תודה על ההתנדבות!")
+                    st.session_state.activities = db.get_activities()
+                    st.rerun()
+        elif a_type == "ride":
+            already = any(p.get("phone","").strip() == my_phone for p in act.get("participants", []))
+            if already:
+                st.success("✅ כבר נרשמת לטרמפ!")
+            elif act.get("event_date", "") >= date.today().isoformat():
+                if st.button("🚗 אני מצטרף/ת לטרמפ!", key="detail_join_ride", type="primary", use_container_width=True):
+                    act.setdefault("participants", []).append({"name": cu["name"], "phone": my_phone})
+                    db._update_by_id("activities", act, id_field="id")
+                    db.invalidate_cache()
+                    st.success("👍 הצטרפת!")
+                    st.session_state.activities = db.get_activities()
+                    st.rerun()
+    else:
+        st.info("🔒 התחבר/י כדי להשתתף.")
+
+
+# ── dispatcher ────────────────────────────────────────────────────
+def show_item_detail():
+    """
+    דף פרטים ייחודי לפריט שנבחר — נפתח בלחיצה על כרטיס בפיד.
+    מחליף את ההרחבה האינלינית ויוצר דף נקי עם מידע מלא + פעולות.
+    """
+    detail = st.session_state.get("_detail_view", {})
+    item_type = detail.get("type", "")
+    item_id   = detail.get("id",   "")
+
+    if not item_id:
+        st.session_state.pop("_detail_view", None)
+        st.rerun()
+        return
+
+    if _detail_back_btn():
+        return
+
+    cu = st.session_state.get("current_user")
+
+    if item_type == "bulk_deal":
+        _show_bulk_detail(item_id, cu)
+    elif item_type == "share_item":
+        _show_share_detail(item_id, cu)
+    elif item_type == "gig_job":
+        _show_gig_detail(item_id, cu)
+    elif item_type in ("activity", "ride", "help_request"):
+        _show_activity_detail(item_id, cu)
+    else:
+        st.warning("סוג פריט לא מוכר.")
+        st.session_state.pop("_detail_view", None)
 
 
 def show_home():
@@ -3435,8 +3814,32 @@ def main():
         st.divider()
         st.caption("MVP · Kfar-Link © 2025\nBuilt with ❤️ + Streamlit")
 
-    # ── ניתוב לדף הנכון ──────────────────────────────────────────
-    if page == "home":
+        # ── כפתור סגירת ה-sidebar ───────────────────────────────
+        # onclick: מחפש את כפתור הקפל של Streamlit ולוחץ עליו.
+        _sq = "'"   # גרש בודד — כדי להימנע מ-escape מסובך
+        _close_js = (
+            "const s=["
+            + _sq + "[data-testid=stSidebarCollapseButton] button" + _sq + ","
+            + _sq + "button[aria-label=Collapse sidebar]" + _sq
+            + "];for(const q of s){const b=document.querySelector(q);if(b){b.click();break;}}"
+        )
+        _close_style = (
+            "width:100%;border:1px solid rgba(0,0,0,0.12);border-radius:14px;"
+            "padding:11px 16px;background:rgba(255,255,255,0.55);cursor:pointer;"
+            "font-size:13px;font-weight:700;color:#374151;direction:rtl;"
+            "font-family:Heebo,Rubik,sans-serif;margin-top:4px;"
+        )
+        _btn_html = (
+            '<button onclick="' + _close_js + '" style="' + _close_style + '">'
+            + "← סגור תפריט</button>"
+        )
+        st.markdown(_btn_html, unsafe_allow_html=True)
+
+    # ── ניתוב לדף הנכון ──────────────────────────────
+    # אם יש _detail_view — דף פרטים ייחודי ללא קשר לניווט הנוכחי
+    if st.session_state.get("_detail_view"):
+        show_item_detail()
+    elif page == "home":
         show_home()
     elif page == "bulk_buy":
         show_bulk_buy()
