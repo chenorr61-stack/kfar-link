@@ -1867,16 +1867,34 @@ def show_bulk_buy():
             )
         st.divider()
 
-    tab_browse, tab_new, tab_history = st.tabs(["📋 עסקאות פעילות", "➕ הצע עסקה חדשה", "📚 עסקאות עבר"])
-
     # ── קפיצה ישירה מהפיד: פותחים אוטומטית את 'פרטים והצטרפות' לעסקה שנבחרה ──
-    # (pop חד-פעמי — אחרי שהפרטים נפתחו, סגירה ידנית לא תיפתח מחדש)
     bulk_focus = st.session_state.pop("_bulk_focus", None)
     if bulk_focus:
         st.session_state[f"show_detail_{bulk_focus}"] = True
 
-    # ── טאב: עיון בעסקאות קיימות ──────────────────────────────
-    with tab_browse:
+    # ── טאבים מותאמים אישית (מבוססי session_state לתמיכה במעבר פרוגרמטי) ──────
+    if "bulk_active_tab" not in st.session_state:
+        st.session_state["bulk_active_tab"] = 0
+
+    _tab_labels = ["📋 עסקאות פעילות", "➕ הצע עסקה חדשה", "📚 עסקאות עבר"]
+    _tc0, _tc1, _tc2 = st.columns(3)
+    for _ti, (_tcol, _tlabel) in enumerate(zip([_tc0, _tc1, _tc2], _tab_labels)):
+        _is_active = (st.session_state["bulk_active_tab"] == _ti)
+        if _tcol.button(
+            _tlabel,
+            key=f"bulk_tab_btn_{_ti}",
+            use_container_width=True,
+            type="primary" if _is_active else "secondary",
+        ):
+            st.session_state["bulk_active_tab"] = _ti
+            st.rerun()
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    _active_tab_idx = st.session_state["bulk_active_tab"]
+
+    # ── טאב 0: עיון בעסקאות קיימות ──────────────────────────────
+    if _active_tab_idx == 0:
         # עסקאות פעילות = תאריך יעד היום או בעתיד, או ללא תאריך יעד
         _today_iso = date.today().isoformat()
         _active_deals = [
@@ -2055,7 +2073,8 @@ def show_bulk_buy():
                 # ══════════════════════════════════════════════════
 
     # ── טאב: הצעת עסקה חדשה ──────────────────────────────────
-    with tab_new:
+    # ── טאב 1: פרסם עסקה חדשה ──────────────────────────────────────
+    elif _active_tab_idx == 1:
         st.markdown("### פרסם עסקת קבוצה חדשה")
 
         # ── כפתור וואטסאפ לבעל עסק ──────────────────────────────────
@@ -2221,7 +2240,8 @@ def show_bulk_buy():
 #  מודול 2 – השאלת ציוד (Share Board)
 # ═══════════════════════════════════════════════════════════════════
 
-    with tab_history:
+    # ── טאב 2: עסקאות עבר ───────────────────────────────────────────
+    elif _active_tab_idx == 2:
         # ── עסקאות שתאריך היעד שלהן עבר ──────────────────────────────
         _today_iso_h = date.today().isoformat()
         _past_deals = [
@@ -2246,7 +2266,7 @@ def show_bulk_buy():
             )
             for _pd in sorted(_past_deals, key=lambda x: x.get("target_date",""), reverse=True):
                 _pd_pricing   = calculate_bulk_price(_pd)
-                _pd_total_u   = _pd_pricing["total_units"]
+                _pd_total_u   = _pd.get("box_size", 1)   # יחידות בארגז (לא סה"כ שהוזמנו)
                 _pd_target_p  = _pd_pricing.get("target_price", _pd["price_retail"])
                 _pd_n_parts   = len(_pd.get("participants", []))
                 _pd_emoji     = _pd.get("product_emoji", "📦")
@@ -2270,7 +2290,7 @@ def show_bulk_buy():
                     f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:0.82em;color:#374151;background:#fff;border-radius:12px;padding:12px;">'
                     f'<div><span style="color:#6b7280;">🏪 ספק:</span> <strong>{_pd.get("supplier","—")}</strong></div>'
                     f'<div><span style="color:#6b7280;">👤 מארגן:</span> <strong>{_pd.get("organizer_name","—")}</strong></div>'
-                    f'<div><span style="color:#6b7280;">📦 כמות יחידות:</span> <strong>{_pd_total_u}</strong></div>'
+                    f'<div><span style="color:#6b7280;">📦 יחידות בארגז:</span> <strong>{_pd_total_u}</strong></div>'
                     f'<div><span style="color:#6b7280;">👥 משתתפים:</span> <strong>{_pd_n_parts}</strong></div>'
                     f'<div><span style="color:#6b7280;">💰 מחיר ליחידה:</span> <strong>{_pd_unit_price}₪</strong></div>'
                     f'<div><span style="color:#6b7280;">🏷️ מחיר קמעונאי:</span> <strong>{_pd.get("price_retail","—")}₪</strong></div>'
@@ -2300,22 +2320,10 @@ def show_bulk_buy():
                         "delivery_cost":    _pd.get("delivery_cost", 0),
                         "no_delivery":      _pd.get("no_delivery", False),
                     }
-                    st.session_state["_switch_to_new_deal_tab"] = True
+                    st.session_state["bulk_active_tab"] = 1  # עבור לטאב "הצע עסקה חדשה"
                     st.rerun()
 
                 st.markdown('<div style="margin-bottom:4px;"></div>', unsafe_allow_html=True)
-
-            # ── מעבר אוטומטי לטאב "הצע עסקה חדשה" לאחר לחיצה על עסקה דומה ──
-            if st.session_state.pop("_switch_to_new_deal_tab", False):
-                st.markdown(
-                    """<script>
-                    setTimeout(function() {
-                        var tabs = window.parent.document.querySelectorAll('[data-baseweb="tab"]');
-                        if (tabs.length >= 2) { tabs[1].click(); }
-                    }, 150);
-                    </script>""",
-                    unsafe_allow_html=True,
-                )
 
 
 def show_share_board():
@@ -4057,6 +4065,26 @@ def main():
         st.metric("משרות פתוחות", open_jobs)
         st.metric("פעילויות קרובות", upcoming)
         st.metric("פריטים להשאלה", len(st.session_state.share_items))
+
+        # ── הדרכת התקנה לטלפון ──────────────────────────────────────
+        st.divider()
+        with st.expander("📲 הוסף למסך הבית"):
+            st.markdown(
+                "<div style='direction:rtl;font-size:0.82em;'>"
+                "<b>🤖 Android (Chrome):</b><br>"
+                "1. לחץ על &#8942; (שלוש נקודות) בפינה הימנית העליונה<br>"
+                "2. בחר <b>&#x27;הוסף למסך הבית&#x27;</b><br>"
+                "3. לחץ <b>&#x27;הוסף&#x27;</b> ✅<br><br>"
+                "<b>🍎 iPhone / iPad (Safari):</b><br>"
+                "1. לחץ על כפתור השיתוף ⬆️ בסרגל התחתון<br>"
+                "2. גלול מטה ובחר <b>&#x27;הוסף למסך הבית&#x27;</b><br>"
+                "3. לחץ <b>&#x27;הוסף&#x27;</b> ✅<br><br>"
+                "<div style='background:#ecfdf5;border-radius:8px;padding:8px;color:#065f46;font-size:0.85em;'>"
+                "💡 לאחר ההוספה, האפליקציה תיפתח ללא סרגל הדפדפן — "
+                "כמו אפליקציה אמיתית!"
+                "</div></div>",
+                unsafe_allow_html=True,
+            )
 
         # ── הפעילויות שלי ─────────────────────────────────────
         # מציג למשתמש המחובר את כל הפריטים שהוא מעורב בהם,
