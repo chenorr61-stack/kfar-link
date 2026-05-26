@@ -486,6 +486,29 @@ st.markdown("""
         filter: none !important;
     }
 
+    /* ── שורת Filter Chips ──────────────────────────────────────────
+       כפתורים קטנים ועגולים לסינון הפיד לפי סוג.
+       הכפתור הפעיל מקבל label עם "✓ " — ה-CSS רק מעצב אותם כ-pills. */
+    [class*="st-key-filter_chip_"] button {
+        border-radius: 20px !important;
+        padding: 3px 8px !important;
+        font-size: 0.76em !important;
+        font-weight: 700 !important;
+        min-height: 0 !important;
+        height: 30px !important;
+        border: 1.5px solid rgba(0,0,0,0.10) !important;
+        background: white !important;
+        color: #374151 !important;
+        transition: background 0.15s ease !important;
+        box-shadow: none !important;
+        white-space: nowrap !important;
+    }
+    [class*="st-key-filter_chip_"] button:hover {
+        background: #f1f5f9 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+
     /* ── גם על קוביות .feed-btn-wrap הישנות (אם נשארו בשימוש) ── */
     .feed-btn-wrap { direction: rtl; margin-bottom: 8px; }
 
@@ -2635,36 +2658,116 @@ def _render_feed_card(
 
 def show_home():
     """
-    פיד ראשי מאוחד: מציג את כל הפעילויות מכל המודולים.
-    סדר: כל הרכישות הקבוצתיות הפעילות למעלה (קדימות מוחלטת),
-    ואז שאר הפריטים ממוינים לפי created_at יורד (החדש ביותר קודם).
+    פיד ראשי מאוחד — כיוון B:
+      • Hero section עם ברכה אישית + stats מהירים
+      • שורת filter chips לסינון לפי סוג
+      • כרטיסים צבעוניים (כל סוג בצבעו)
+      • Empty state יפה כשאין תוצאות
+
+    סדר: רכישות קבוצתיות תמיד ראשונות,
+    שאר הפריטים ממוינים לפי created_at יורד.
     """
     cu = st.session_state.get("current_user")
     greeting_name = cu["name"] if cu else "חבר/ה"
 
+    # ── מצב פילטר (נשמר ב-session_state) ────────────────────────────
+    if "feed_filter" not in st.session_state:
+        st.session_state["feed_filter"] = "all"
+    active_filter = st.session_state["feed_filter"]
+
+    # ── stats לhero ──────────────────────────────────────────────────
+    _active_deals_all = [d for d in st.session_state.bulk_deals if d.get("status") == "open"]
+    _total_share      = len(st.session_state.share_items)
+    _upcoming_acts    = sum(
+        1 for a in st.session_state.activities
+        if a.get("event_date", "") >= date.today().isoformat()
+    )
+    _open_jobs = sum(1 for j in st.session_state.gig_jobs if j.get("status") == "open")
+
+    # ── ברכה לפי שעה ─────────────────────────────────────────────────
+    _hour = datetime.now().hour
+    if _hour < 12:
+        _time_greet = "בוקר טוב"
+    elif _hour < 17:
+        _time_greet = "צהריים טובים"
+    elif _hour < 21:
+        _time_greet = "ערב טוב"
+    else:
+        _time_greet = "לילה טוב"
+
+    # ── Hero Section ──────────────────────────────────────────────────
     st.markdown(
         f"""
-        <div style="direction:rtl;">
-            <h1 style="color:#00695c; margin-bottom:4px;">🏘️ שלום {greeting_name}!</h1>
-            <p style="color:#607d8b; font-size:1.05em; margin-top:0;">
-                מה קורה בכפר עכשיו 🌊 — גלול/י ולחץ/י על כל כרטיס כדי לצפות בפרטים.
-            </p>
+        <div style="
+            background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 60%,#dcfce7 100%);
+            border-radius:20px;
+            padding:20px 24px 18px;
+            margin-bottom:10px;
+            direction:rtl;
+            font-family:'Heebo','Rubik','Assistant','Segoe UI',sans-serif;
+            border:1px solid #bbf7d0;
+        ">
+            <div style="font-size:1.35em;font-weight:800;color:#14532d;margin-bottom:3px;">
+                {_time_greet}, {greeting_name}! 🌿
+            </div>
+            <div style="font-size:0.87em;color:#16a34a;margin-bottom:14px;">
+                הנה מה שקורה בכפר עכשיו — לחץ/י על כרטיס לפרטים
+            </div>
+            <div style="display:flex;gap:9px;flex-wrap:wrap;">
+                <div style="background:white;border-radius:12px;padding:7px 13px;border:1px solid #bbf7d0;text-align:center;min-width:54px;">
+                    <div style="font-size:1.25em;font-weight:800;color:#f59e0b;">{len(_active_deals_all)}</div>
+                    <div style="font-size:0.68em;color:#6b7280;">🛒 קניות</div>
+                </div>
+                <div style="background:white;border-radius:12px;padding:7px 13px;border:1px solid #bbf7d0;text-align:center;min-width:54px;">
+                    <div style="font-size:1.25em;font-weight:800;color:#10b981;">{_total_share}</div>
+                    <div style="font-size:0.68em;color:#6b7280;">📦 ציוד</div>
+                </div>
+                <div style="background:white;border-radius:12px;padding:7px 13px;border:1px solid #bbf7d0;text-align:center;min-width:54px;">
+                    <div style="font-size:1.25em;font-weight:800;color:#3b82f6;">{_upcoming_acts}</div>
+                    <div style="font-size:0.68em;color:#6b7280;">🎉 פעילויות</div>
+                </div>
+                <div style="background:white;border-radius:12px;padding:7px 13px;border:1px solid #bbf7d0;text-align:center;min-width:54px;">
+                    <div style="font-size:1.25em;font-weight:800;color:#ec4899;">{_open_jobs}</div>
+                    <div style="font-size:0.68em;color:#6b7280;">💼 עבודות</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+    # ── שורת Filter Chips ─────────────────────────────────────────────
+    # 7 סוגי תוכן — הכפתור הפעיל מקבל "✓ " בהתחלה.
+    # הכפתורים הם st.button אמיתיים בתוך st.columns, מעוצבים ע"י CSS.
+    _filter_opts = [
+        ("all",      "הכל"),
+        ("bulk",     "🛒 קניות"),
+        ("share",    "📦 ציוד"),
+        ("gig",      "💼 עבודה"),
+        ("activity", "🎉 פעילות"),
+        ("ride",     "🚗 טרמפ"),
+        ("help",     "🆘 עזרה"),
+    ]
+    _fcols = st.columns(len(_filter_opts))
+    for _fc, (_fk, _fl) in zip(_fcols, _filter_opts):
+        _label = f"✓ {_fl}" if _fk == active_filter else _fl
+        if _fc.button(_label, key=f"filter_chip_{_fk}", use_container_width=True):
+            st.session_state["feed_filter"] = _fk
+            st.rerun()
+
     # ══════════════════════════════════════════
     # חלק 1: רכישות קבוצתיות פעילות (תמיד למעלה)
     # ══════════════════════════════════════════
-    active_deals = [d for d in st.session_state.bulk_deals if d.get("status") == "open"]
-    if active_deals:
+    active_deals = _active_deals_all
+    _show_bulk = (active_filter in ("all", "bulk"))
+
+    if _show_bulk and active_deals:
         st.markdown(
             "<div class='feed-hero-header'>🛒 קבוצות רכישה פעילות עכשיו</div>",
             unsafe_allow_html=True,
         )
         for deal in active_deals:
-            # חישוב: כמה יחידות כבר נתפסו מול כמה חסרות לארגז שלם
+            # חישוב: כמה יחידות נשארות לארגז הבא
             committed = sum(p.get("quantity", 0) for p in deal.get("participants", []))
             box_size = deal.get("box_size", 1) or 1
             units_in_last_box = committed % box_size
@@ -2697,7 +2800,6 @@ def show_home():
     # ══════════════════════════════════════════
     # חלק 2: כל השאר — ממוין לפי created_at (חדש → ישן)
     # ══════════════════════════════════════════
-    # איסוף כל הפריטים לרשימה מאוחדת עם מטא-דאטה אחידה
     feed_items = []
 
     # פעילויות / טרמפים / בקשות עזרה
@@ -2765,7 +2867,7 @@ def show_home():
             "target_page": "share_board",
         })
 
-    # עבודות מזדמנות פתוחות (לא מציגים סגורות — פחות רלוונטיות לפיד)
+    # עבודות מזדמנות פתוחות בלבד
     for j in st.session_state.gig_jobs:
         if j.get("status") != "open":
             continue
@@ -2784,20 +2886,63 @@ def show_home():
             "target_page": "gig_jobs",
         })
 
-    # מיון יורד לפי created_at (ISO format → השוואה מילונית עובדת)
+    # ── פילטור לפי הבחירה ─────────────────────────────────────────────
+    # מיפוי: שם פילטר → תחילית btn_key של הפריטים הרלוונטיים
+    _PREFIX_MAP = {
+        "share":    "feed_share_",
+        "gig":      "feed_gig_",
+        "activity": "feed_act_",
+        "ride":     "feed_ride_",
+        "help":     "feed_help_",
+    }
+    if active_filter == "bulk":
+        feed_items = []          # רק רכישות — כבר הוצגו בחלק 1
+    elif active_filter in _PREFIX_MAP:
+        _pfx = _PREFIX_MAP[active_filter]
+        feed_items = [item for item in feed_items if item.get("btn_key", "").startswith(_pfx)]
+    # "all" → לא מסננים
+
+    # מיון יורד לפי created_at
     feed_items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
+    # ── הצגת פריטים / Empty State ─────────────────────────────────────
     if feed_items:
+        if active_filter == "all":
+            st.markdown(
+                "<div class='feed-section-header'>📰 מה חדש בכפר</div>",
+                unsafe_allow_html=True,
+            )
+        for item in feed_items:
+            item.pop("created_at", None)   # created_at משמש רק למיון
+            _render_feed_card(**item)
+
+    elif not active_deals or active_filter not in ("all", "bulk"):
+        # ── Empty State יפה ──────────────────────────────────────────
+        _EMPTY = {
+            "all":      ("🌱", "הכפר שקט עכשיו",          "היה/י הראשון/ה לפרסם משהו!"),
+            "bulk":     ("🛒", "אין קניות קבוצתיות פעילות", "פתח/י קבוצת רכישה חדשה"),
+            "share":    ("📦", "אין פריטים להשאלה",         "פרסם/י ציוד שיש לך"),
+            "gig":      ("💼", "אין עבודות פתוחות",         "פרסם/י עבודה מזדמנת"),
+            "activity": ("🎉", "אין פעילויות קרובות",       "הכרז/י על פעילות חדשה"),
+            "ride":     ("🚗", "אין טרמפים פעילים",          "פרסם/י טרמפ בלשונית פעילויות"),
+            "help":     ("🆘", "אין בקשות עזרה",            "כולם מסתדרים לבד — כרגע 😊"),
+        }
+        _ei, _et, _es = _EMPTY.get(active_filter, _EMPTY["all"])
         st.markdown(
-            "<div class='feed-section-header'>📰 מה חדש בכפר</div>",
+            f"""
+            <div style="
+                text-align:center;
+                padding:44px 20px;
+                direction:rtl;
+                font-family:'Heebo','Rubik','Assistant','Segoe UI',sans-serif;
+            ">
+                <div style="font-size:3.5em;margin-bottom:12px;">{_ei}</div>
+                <div style="font-size:1.15em;font-weight:800;color:#374151;margin-bottom:8px;">{_et}</div>
+                <div style="font-size:0.88em;color:#9ca3af;">{_es}</div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        for item in feed_items:
-            # created_at משמש רק למיון — לא נשלח ל-_render_feed_card
-            item.pop("created_at", None)
-            _render_feed_card(**item)
-    elif not active_deals:
-        st.info("אין עדיין פעילות בכפר. תהיה/י הראשון/ה לפרסם משהו! 🌱")
 
 
 # ═══════════════════════════════════════════════════════════════════
