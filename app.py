@@ -63,6 +63,19 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────
+#  PWA – תמיכה בסמל מסך הבית (iOS + Android)
+# ─────────────────────────────────────────────────
+st.markdown("""
+<link rel="manifest" href="/app/static/manifest.json">
+<link rel="apple-touch-icon" href="/app/static/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kfar-Link">
+<meta name="theme-color" content="#0f2a3d">
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────
 #  CSS – עיצוב נקי וידידותי למובייל
 # ─────────────────────────────────────────────────
 st.markdown("""
@@ -1854,7 +1867,7 @@ def show_bulk_buy():
             )
         st.divider()
 
-    tab_browse, tab_new = st.tabs(["📋 עסקאות פעילות", "➕ הצע עסקה חדשה"])
+    tab_browse, tab_new, tab_history = st.tabs(["📋 עסקאות פעילות", "➕ הצע עסקה חדשה", "📚 עסקאות עבר"])
 
     # ── קפיצה ישירה מהפיד: פותחים אוטומטית את 'פרטים והצטרפות' לעסקה שנבחרה ──
     # (pop חד-פעמי — אחרי שהפרטים נפתחו, סגירה ידנית לא תיפתח מחדש)
@@ -1864,10 +1877,16 @@ def show_bulk_buy():
 
     # ── טאב: עיון בעסקאות קיימות ──────────────────────────────
     with tab_browse:
-        if not st.session_state.bulk_deals:
+        # עסקאות פעילות = תאריך יעד היום או בעתיד, או ללא תאריך יעד
+        _today_iso = date.today().isoformat()
+        _active_deals = [
+            (i, d) for i, d in enumerate(st.session_state.bulk_deals)
+            if not d.get("target_date") or d["target_date"] >= _today_iso
+        ]
+        if not _active_deals:
             st.info("אין עסקאות פעילות כרגע. היה הראשון להציע!")
         else:
-            for i, deal in enumerate(st.session_state.bulk_deals):
+            for i, deal in [(i, d) for i, d in _active_deals]:
                 # ── הסרה אוטומטית של משתתפים שפגה תפוגתם ──
                 deal, removed = remove_expired_participants(deal)
                 st.session_state.bulk_deals[i] = deal
@@ -2079,6 +2098,17 @@ def show_bulk_buy():
             pass  # require_login הציג הודעה
         else:
             st.caption(f"📋 מארגן: **{cu_new_deal['name']}** | 📞 {cu_new_deal['phone']}")
+
+            # ── קריאת פרה-פיל מעסקה דומה (אם קיים) ──────────────────
+            _prefill = st.session_state.pop("_prefill_deal", None)
+            if _prefill:
+                st.session_state.pop("_open_similar_banner", None)
+                st.info(
+                    f"📋 הטופס מולא מעסקה דומה: **{_prefill.get('name','')}** "
+                    f"(ספק: {_prefill.get('supplier','')}). ערוך לפי הצורך ושלח."
+                )
+            _pf = _prefill or {}
+
             with st.form("new_deal_form"):
                 # ── פרטי המוצר ──
                 st.markdown("**📦 פרטי המוצר:**")
@@ -2190,6 +2220,89 @@ def show_bulk_buy():
 # ═══════════════════════════════════════════════════════════════════
 #  מודול 2 – השאלת ציוד (Share Board)
 # ═══════════════════════════════════════════════════════════════════
+
+    with tab_history:
+        # ── עסקאות שתאריך היעד שלהן עבר ──────────────────────────────
+        _today_iso_h = date.today().isoformat()
+        _past_deals = [
+            d for d in st.session_state.bulk_deals
+            if d.get("target_date") and d["target_date"] < _today_iso_h
+        ]
+
+        if not _past_deals:
+            st.markdown(
+                "<div style='text-align:center;padding:40px 20px;direction:rtl;'>"
+                "<div style='font-size:3em;'>📭</div>"
+                "<div style='font-size:1.1em;font-weight:700;color:#374151;margin:10px 0;'>אין עסקאות עבר עדיין</div>"
+                "<div style='font-size:0.85em;color:#6b7280;'>עסקאות שתאריך היעד שלהן יעבור יופיעו כאן</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"<div style='direction:rtl;font-size:0.85em;color:#6b7280;margin-bottom:12px;'>"
+                f"נמצאו {len(_past_deals)} עסקאות שהסתיימו</div>",
+                unsafe_allow_html=True,
+            )
+            for _pd in sorted(_past_deals, key=lambda x: x.get("target_date",""), reverse=True):
+                _pd_pricing   = calculate_bulk_price(_pd)
+                _pd_total_u   = _pd_pricing["total_units"]
+                _pd_target_p  = _pd_pricing.get("target_price", _pd["price_retail"])
+                _pd_n_parts   = len(_pd.get("participants", []))
+                _pd_emoji     = _pd.get("product_emoji", "📦")
+                _pd_status_cl = {"open":"🟢","closed":"🎉","cancelled":"🔴","done":"✅"}.get(_pd.get("status",""), "⚪")
+
+                # כרטיס עסקת עבר
+                st.markdown(
+                    f'<div style="background:#f9fafb;border-radius:20px;padding:20px 20px 14px 20px;'
+                    f'direction:rtl;border:1px solid #e5e7eb;margin-bottom:8px;">'
+                    f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
+                    f'<div style="font-size:1.8em;">{_pd_emoji}</div>'
+                    f'<div>'
+                    f'<div style="font-size:1.05em;font-weight:800;color:#111;">{_pd["name"]}</div>'
+                    f'<div style="font-size:0.78em;color:#6b7280;">ספק: {_pd.get("supplier","—")} · מארגן: {_pd.get("organizer_name","—")}</div>'
+                    f'</div></div>'
+                    f'<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.8em;color:#374151;">'
+                    f'<span>📅 {_pd.get("target_date","—")}</span>'
+                    f'<span>👥 {_pd_n_parts} משתתפים</span>'
+                    f'<span>📦 {_pd_total_u} יחידות</span>'
+                    f'<span>💰 {_pd_target_p}₪ ליחידה</span>'
+                    f'<span>{_pd_status_cl} {_pd.get("status","")}</span>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                # כפתור "פתח עסקה דומה"
+                _prefill_key = f"prefill_similar_{_pd['id']}"
+                if st.button(
+                    "📋 פתח עסקה דומה",
+                    key=f"similar_btn_{_pd['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state["_prefill_deal"] = {
+                        "name":         _pd.get("name", ""),
+                        "supplier":     _pd.get("supplier", ""),
+                        "product_emoji":_pd.get("product_emoji", "📦"),
+                        "price_retail": _pd.get("price_retail", 0),
+                        "price_per_box":_pd.get("price_per_box", 0),
+                        "box_size":     _pd.get("box_size", 1),
+                        "description":  _pd.get("description", ""),
+                        "business_address": _pd.get("business_address", ""),
+                        "business_hours":   _pd.get("business_hours", ""),
+                        "business_phone":   _pd.get("business_phone", ""),
+                        "delivery_cost":    _pd.get("delivery_cost", 0),
+                        "no_delivery":      _pd.get("no_delivery", False),
+                    }
+                    st.session_state["_open_similar_banner"] = True
+                    st.rerun()
+
+                st.markdown('<div style="margin-bottom:4px;"></div>', unsafe_allow_html=True)
+
+            # באנר כשנטענה עסקה דומה
+            if st.session_state.get("_open_similar_banner"):
+                st.success("✅ פרטי העסקה הועברו לטופס! לחץ על הטאב '➕ הצע עסקה חדשה' להשלמה.")
+
 
 def show_share_board():
     """לוח השאלת ציוד – מציע/מחפש עם לינקים ל-WhatsApp."""
